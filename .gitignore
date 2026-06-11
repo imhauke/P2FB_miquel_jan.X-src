@@ -1,0 +1,12 @@
+# Ignore everything by default
+*
+
+# But do not ignore directories so Git can recurse into them
+!*/
+
+# Keep C source and header files anywhere in the tree
+!*.c
+!*.h
+
+# Keep .gitignore tracked
+!.gitignore
