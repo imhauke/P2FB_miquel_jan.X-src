@@ -23,7 +23,6 @@ static char   animals[NUM_ESPECIES];
 static char   animals_desperts[NUM_ESPECIES];
 static char   q_animals;
 static char   productes[NUM_ESPECIES];
-static char   count_son;
 
 static unsigned char t;
 
@@ -33,7 +32,6 @@ void initController(void) {
     flag_comptatge = 0;
     i = 0; j = 0; k = 0;
     q_animals = 0;
-    count_son = 0;
 
     animals[0] = 0;          animals[1] = 0;
     animals[2] = 0;          animals[3] = 0;
@@ -82,20 +80,25 @@ void guardaTempsAnimal(void) {
 static char afegirNouAnimal(char esp) {
     if (q_animals >= MAX_ANIMALS_TOTAL) return 0;
     if (animals_arr[k].tipus != 0)      return 0; // slot ocupat
-    animals_arr[k].tipus   = esp + 1;
-    animals_arr[k].despert = 1;
+    animals_arr[k].tipus     = esp + 1;
+    animals_arr[k].despert   = 1;
+    animals_arr[k].count_son = 0;   // comenca a comptar els seus 2 min
     animals[esp]++;
     animals_desperts[esp]++;
     q_animals++;
     return 1;
 }
 
-// --- Posa l'animal k en son critic si escau (un pas, sense bucle) ---
+// --- Compta el segon de l'animal k; si arriba a 2 min, son critic (un pas) ---
 static char posarAnimalsASon(void) {
     if (k >= MAX_ANIMALS_TOTAL) return 0;
     if (animals_arr[k].tipus != 0 && animals_arr[k].despert == 1) {
-        animals_arr[k].despert = 0;
-        animals_desperts[animals_arr[k].tipus - 1]--;
+        animals_arr[k].count_son++;
+        if (animals_arr[k].count_son >= TEMPS_SON) {
+            animals_arr[k].count_son = 0;
+            animals_arr[k].despert   = 0;
+            animals_desperts[animals_arr[k].tipus - 1]--;
+        }
     }
     k++;
     return 1;
@@ -134,17 +137,27 @@ void motorController(void) {
 
         // Identifica comandament entrant
         case 1:
-            if (c == CMD_INITIALIZE) { i = 0; j = 0; state = 2; }
+            if (c == CMD_INITIALIZE) { 
+                i = 0; 
+                j = 0; 
+                state = 2;
+            }
             break;
 
         // Llegeix nom granja fins '$'
         case 2:
-            if (SiCharAvail()) { c = SiGetChar(); state = 3; }
+            if (SiCharAvail()) { 
+                c = SiGetChar(); 
+                state = 3; 
+            }
             break;
 
         case 3:
             if (c != '$') {
-                if (i < MAX_NOM) { nom_granja[i] = c; i++; }
+                if (i < MAX_NOM) { 
+                    nom_granja[i] = c; 
+                    i++; 
+                }
                 state = 2;
             } else {
                 nom_granja[i] = '\0';
@@ -155,12 +168,20 @@ void motorController(void) {
 
         // Llegeix 4 temps de generacio
         case 4:
-            if (j < NUM_ESPECIES) { state = 5; }
-            else { flag_init = 1; state = 0; }
+            if (j < NUM_ESPECIES) { 
+                state = 5; 
+            }
+            else { 
+                flag_init = 1; 
+                state = 0; 
+            }
             break;
 
         case 5:
-            if (SiCharAvail()) { c = SiGetChar(); state = 6; }
+            if (SiCharAvail()) { 
+                c = SiGetChar(); 
+                state = 6; 
+            }
             break;
 
         case 6:
@@ -214,14 +235,12 @@ void motorController(void) {
         case 10:
             if (count_temps_animal[i] >= temps_animal[i]) {
                 count_temps_animal[i] = 0;
-                if (q_animals < MAX_ANIMALS_TOTAL) {
-                    k = 0;
-                    state = 20;
-                    break;
-                }
+                k = 0;
+                state = 20;
+            } else {
+                i++;
+                state = 9;
             }
-            i++;
-            state = 9;
             break;
 
         // Busca slot lliure per afegir animal d'especie i, un pas per crida
@@ -259,19 +278,13 @@ void motorController(void) {
             state = 11;
             break;
 
-        // --- Son critic global cada 2 minuts ---
+        // --- Cada segon: compta el son critic individual de cada animal ---
         case 13:
-            count_son++;
-            if (count_son >= TEMPS_SON) {
-                count_son = 0;
-                k = 0;
-                state = 14;
-            } else {
-                state = 0;
-            }
+            k = 0;
+            state = 14;
             break;
 
-        // Posa animals a son critic, un per crida
+        // Compta el segon de cada animal; dorm els que arribin a 2 min
         case 14:
             if (posarAnimalsASon()) {
                 // continua fins k >= MAX_ANIMALS_TOTAL
