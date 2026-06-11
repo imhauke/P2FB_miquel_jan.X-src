@@ -1,7 +1,8 @@
-#include <xc.h>
-#include "tad_controller.h"
 
-#pragma config OSC = HSPLL
+// cambiar codigo usando numero diferente de variables, definidas de forma diferente, nombres diferentes, usar consatntes con defin,
+//  y cambiar logica de flags e ifs, añadidendo mas o menos, y o juntando cosas en un mismo tad
+
+
 #pragma config PBADEN = DIG
 #pragma config WDT = OFF
 #pragma config MCLRE = ON
@@ -18,22 +19,16 @@ void __interrupt() RSI_HIGH(void) {
 
 void main(void) {
     TI_Init();
-    CONTROLLER_init();
-    HALL_init();
-    SiInit();
-    MNG_SIO_init();
-    initTeclat();
-    pulsadorInit();
-    SPEAKER_init();
-    LEDS_init();
-    TRISBbits.TRISB4 = 0;
+    initSioAux();
+    initController();
+    initControllerAdc();
+    initJoystick();
+    initLDR();
     while (1) {
-        LATBbits.LATB4 = !LATBbits.LATB4;
-        CONTROLLER_motor();
-        MNG_SIO_motor();
-        motorTeclat();
-        motorPulsador();
-        SPEAKER_motor();
-        LEDS_motorIntensity();
+        motorSioAux();
+        motorController();
+        motorControllerAdc();
+        motorJoystick();
+        motorLDR();
     }
 }

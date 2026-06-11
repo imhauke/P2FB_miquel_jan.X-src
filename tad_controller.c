@@ -1,328 +1,282 @@
 #include "tad_controller.h"
 
-static unsigned char t;
-static char count_tecles,i;
-static unsigned char count_segons;
-static char pin[MAX_PIN];
-static int ticks_alarma;
-static char intents_erronis;
-static char index = 0;
-static char buffer[3];
-static unsigned char t_led;
-static char duty_leds;
+#define MAX_NOM    16
+#define MAX_BUFFER  3
 
-void CONTROLLER_init(void) {
+// --- Variables privades ---
+static char nom_granja[32];
+static char buffer[MAX_BUFFER];
+static char c;
+static char i, j, k;
+static char flag_init, flag_comptatge;
+
+static char           temps_animal[NUM_ESPECIES];
+static char           temps_decimal;
+static char           count_temps_animal[NUM_ESPECIES];
+static char           count_temps_producte[NUM_ESPECIES];
+static const char     temps_producte[NUM_ESPECIES] = {
+    TEMPS_PROD_VACA, TEMPS_PROD_CAVALL, TEMPS_PROD_PORC, TEMPS_PROD_GALLINA
+};
+
+static Animal animals_arr[MAX_ANIMALS_TOTAL];
+static char   animals[NUM_ESPECIES];
+static char   animals_desperts[NUM_ESPECIES];
+static char   q_animals;
+static char   productes[NUM_ESPECIES];
+static char   count_son;
+
+static unsigned char t;
+
+// --- Init ---
+void initController(void) {
+    flag_init      = 0;
+    flag_comptatge = 0;
+    i = 0; j = 0; k = 0;
+    q_animals = 0;
+    count_son = 0;
+
+    animals[0] = 0;          animals[1] = 0;
+    animals[2] = 0;          animals[3] = 0;
+    animals_desperts[0] = 0; animals_desperts[1] = 0;
+    animals_desperts[2] = 0; animals_desperts[3] = 0;
+    count_temps_animal[0] = 0;  count_temps_animal[1] = 0;
+    count_temps_animal[2] = 0;  count_temps_animal[3] = 0;
+    count_temps_producte[0] = 0; count_temps_producte[1] = 0;
+    count_temps_producte[2] = 0; count_temps_producte[3] = 0;
+    productes[0] = 0; productes[1] = 0;
+    productes[2] = 0; productes[3] = 0;
+
+    animals_arr[0].tipus=0;  animals_arr[1].tipus=0;  animals_arr[2].tipus=0;
+    animals_arr[3].tipus=0;  animals_arr[4].tipus=0;  animals_arr[5].tipus=0;
+    animals_arr[6].tipus=0;  animals_arr[7].tipus=0;  animals_arr[8].tipus=0;
+    animals_arr[9].tipus=0;  animals_arr[10].tipus=0; animals_arr[11].tipus=0;
+    animals_arr[12].tipus=0; animals_arr[13].tipus=0; animals_arr[14].tipus=0;
+    animals_arr[15].tipus=0; animals_arr[16].tipus=0; animals_arr[17].tipus=0;
+    animals_arr[18].tipus=0; animals_arr[19].tipus=0; animals_arr[20].tipus=0;
+    animals_arr[21].tipus=0; animals_arr[22].tipus=0; animals_arr[23].tipus=0;
+
     TI_NewTimer(&t);
-    TI_NewTimer(&t_led);
 }
 
-void CONTROLLER_motor(void){
+// --- Auxiliars parser INITIALIZE ---
+void guardaCaracterTemps(void) {
+    if (c != '\r') { buffer[i] = c; i++; }
+}
 
+void ferItoaTemps(void) {
+    char sumand = buffer[0] - '0';
+    if (i == 1) {
+        temps_decimal = sumand;
+    } else {
+        temps_decimal = sumand + sumand + sumand + sumand + sumand +
+                        sumand + sumand + sumand + sumand + sumand +
+                        (buffer[1] - '0');
+    }
+}
+
+void guardaTempsAnimal(void) {
+    temps_animal[j] = temps_decimal;
+}
+
+// --- Afegeix un animal d'especie esp al slot k (un pas, sense bucle) ---
+static char afegirNouAnimal(char esp) {
+    if (q_animals >= MAX_ANIMALS_TOTAL) return 0;
+    if (animals_arr[k].tipus != 0)      return 0; // slot ocupat
+    animals_arr[k].tipus   = esp + 1;
+    animals_arr[k].despert = 1;
+    animals[esp]++;
+    animals_desperts[esp]++;
+    q_animals++;
+    return 1;
+}
+
+// --- Posa l'animal k en son critic si escau (un pas, sense bucle) ---
+static char posarAnimalsASon(void) {
+    if (k >= MAX_ANIMALS_TOTAL) return 0;
+    if (animals_arr[k].tipus != 0 && animals_arr[k].despert == 1) {
+        animals_arr[k].despert = 0;
+        animals_desperts[animals_arr[k].tipus - 1]--;
+    }
+    k++;
+    return 1;
+}
+
+// --- Incrementa productes de l'especie i ---
+static void incrementarProductes(char esp) {
+    productes[esp] += animals_desperts[esp];
+}
+
+// --- Motor principal ---
+void motorController(void) {
     static char state = 0;
 
-    switch(state){
+    switch (state) {
 
+        // Espera inicialitzacio completa (Java + hora serial)
         case 0:
-            if(statusFiMissatge()) {
-                enviaMissatge(FRASE_1);
-                LEDS_setOK(1);
-                LEDS_setAlarm(0);
-                SPEAKER_stop();
-                state = 1;
+            if (flag_init == 1 && V_isFlagOk()) {
+                TI_ResetTics(t);
+                i = 0;
+                state = 7;
+                break;
             }
-        break;
-
-        case 1:
-            if(statusFiMissatge()) {
-                if(hiHaCampMagnetic()) {
-                    enviaMissatge(FRASE_2);
-                    TI_ResetTics(t);
-                    SPEAKER_startAgut();
-                    state = 2;
-                }
+            if (SiCharAvail()) {
+                c = SiGetChar();
+                state = 1;
+                break;
+            }
+            if (flag_comptatge == 1 && TI_GetTics(t) >= SEGON) {
+                TI_ResetTics(t);
+                i = 0;
+                state = 9;
             }
             break;
 
+        // Identifica comandament entrant
+        case 1:
+            if (c == CMD_INITIALIZE) { i = 0; j = 0; state = 2; }
+            break;
+
+        // Llegeix nom granja fins '$'
         case 2:
-            if(TI_GetTics(t) >= 4000) {
-                SPEAKER_stop();
-                enviaMissatge(FRASE_3);
-                TI_ResetTics(t);
-                state = 3;
-            }
+            if (SiCharAvail()) { c = SiGetChar(); state = 3; }
             break;
 
         case 3:
-            if(TI_GetTics(t) >= 1000) {
-                enviaMissatge(FRASE_4);
-                count_tecles = 0;
-                count_segons = 0;
-                ticks_alarma = 2000; //1 segon entre tons greus
-                intents_erronis = 0;
-                LEDS_startIntensity();
-                duty_leds = 0;
-                LEDS_setDuty(duty_leds);
-                TI_ResetTics(t);
-                TI_ResetTics(t_led);
+            if (c != '$') {
+                if (i < MAX_NOM) { nom_granja[i] = c; i++; }
+                state = 2;
+            } else {
+                nom_granja[i] = '\0';
+                i = 0;
                 state = 4;
             }
             break;
 
+        // Llegeix 4 temps de generacio
         case 4:
-            if(TECLAT_HHT()) {
-                pin[count_tecles] = TECLAT_getTecla();
-                enviaCaracter(pin[count_tecles]);
-                count_tecles++;
-                state = 5;
-            }
-
-            // subir duty del LED cada 3 segundos durante los 2 minutos
-            if(TI_GetTics(t_led) >= 6000) {
-                TI_ResetTics(t_led);
-                if(duty_leds < 40) {
-                    duty_leds++;
-                    LEDS_setDuty(duty_leds);
-                }
-            }
-
-            if(TI_GetTics(t) >= ticks_alarma) {
-                SPEAKER_startGreu();
-                TI_ResetTics(t);
-                count_segons++;
-            }
-
-            if(count_segons == 105) {
-                // cuando pase 1:45, sonará el grave cada medio segundo
-                ticks_alarma = 1000;
-            }
-            else if(count_segons == 135) {
-                // han pasado 2 minutos y se activa el sistema de alarma
-                state = 9;
-            }
-
+            if (j < NUM_ESPECIES) { state = 5; }
+            else { flag_init = 1; state = 0; }
             break;
 
         case 5:
-            if(count_tecles == MAX_PIN) {
-                i = 0;
-                state = 6;
-            }else{
-                state = 4;
-            }
+            if (SiCharAvail()) { c = SiGetChar(); state = 6; }
             break;
 
         case 6:
-            if(i < MAX_PIN) {
-                if(PIN_PREDEFINIT[i] == pin[i]) {
-                    //coincideix el caracter
-                    i++;
-                }else{
-                    //hi ha una diferencia en el pin
-                    intents_erronis++;
-                    state = 7;
-                }
-            }else{
-                //els pins son iguals
-                // JAN
-                LEDS_stopIntensity();
-                enviaMissatge(FRASE_8);
-                TI_ResetTics(t);
-                state = 11;
-            }
-            break;
-
-        case 7:
-            if(intents_erronis < MAX_INTENTS) {
-                enviaMissatge(FRASE_5);
-                state = 8;
-            }else{
-                state = 9;
-            }
-            break;
-
-        case 8:
-            if(statusFiMissatge()) {
-                count_tecles = 0;
-                enviaMissatge(FRASE_4);
+            if (c == '\r') {
+                state = 5;
+            } else if (c != '$' && c != '\n') {
+                if (i < MAX_BUFFER - 1) { buffer[i] = c; i++; }
+                state = 5;
+            } else {
+                buffer[i] = '\0';
+                ferItoaTemps();
+                guardaTempsAnimal();
+                j++; i = 0;
                 state = 4;
             }
             break;
 
-        case 9:
-            if(SiAvail()) {
-                enviaMissatge(FRASE_6);
-                LEDS_setOK(0); //Apaga led verde
-                LEDS_setAlarm(1);
-                LEDS_stopIntensity();
-                SPEAKER_startAlarma();
-                TI_ResetTics(t);
-                state = 70;
-            }
-            break;
-        case 70:
-            if(TI_GetTics(t)>20500){
-                SPEAKER_stop();
-                state = 10;
-            }
-            
-            break;
-        case 10:
-            if(statusFiMissatge()) {
-                enviaMissatge(FRASE_7);
-                //JAN
-                index = 0;
-                state = 16; //gestionar recepció del reset system
-            }
-            break;
-        
-        case 11:
-            if (TI_GetTics(t) >= 4000) {
-                enviaMissatge(FRASE_9);
-                TI_ResetTics(t);
-                SPEAKER_startAgut();
-                state = 50;
+        // Copia data al LCD
+        case 7:
+            if (i < 5) {
+                nom_granja[i + 16] = V_getData(i);
+                i++;
+            } else {
+                i = 0;
+                state = 8;
             }
             break;
 
-        case 50:
-            if (TI_GetTics(t) >= 1000) {
-                SPEAKER_stop();
-                state = 12;
-            }
-            break;
-        
-        case 12:
-            
-            if (HiHaPulsador()) {
-                //exit requested
-                enviaMissatge(FRASE_10);
-                index = 0;
-                state = 13;
-            }
-            break;
-        
-        case 13:
-            if (SiCharAvail()) {
-                char c = SiGetChar();
-
-                if(c == '\r') {
-                    state = 18;
-                }else{
-                    SiSendChar(c);
-                    if(index < 3) {
-                        buffer[index] = c;
-                    }
-                    index++;
-                }
-            }
-            break;
-        
-        case 14:
-                enviaMissatge(FRASE_11);
-                TI_ResetTics(t);
-                
-                
-                state = 15;
-            break;
-
-        case 15:
-            if (TI_GetTics(t) >= 4000) {
-                enviaMissatge(FRASE_12);
-                SPEAKER_startAgut();
-                TI_ResetTics(t);
-                state = 51;
-            }
-            break;
-            
-        case 51:
-            if (TI_GetTics(t) >= 1000) {
-                SPEAKER_stop();
+        // Imprimeix nom_granja al LCD caracter a caracter
+        case 8:
+            if (i < 32) {
+                LcPutChar(nom_granja[i]);
+                i++;
+            } else {
+                flag_comptatge = 1;
                 state = 0;
             }
             break;
 
-        case 16:
-            if (SiCharAvail()) {
-                char c = SiGetChar();
-
-                if(c == '\r') {
-                    state = 17;
-                }else{
-                    SiSendChar(c);
-                    if(index < 3) {
-                        buffer[index] = c;
-                    }
-                    index++;
-                }
-            }
-            break;
-
-        case 17:
-            if(index == 3) {
-                if(buffer[0] == 'Y' && buffer[1] == 'e' && buffer[2] == 's') {
-                    state = 30; //Reset system ok
-                }else{
-                    state = 10; //tornem a mostrar reset system
-                }
-            }else{
+        // --- Cada segon: generacio animals, especie i ---
+        case 9:
+            if (i < NUM_ESPECIES) {
+                count_temps_animal[i]++;
                 state = 10;
-            }
-            break;
-//
-        case 18:
-            if(index == 3) {
-                if(buffer[0] == 'Y' && buffer[1] == 'e' && buffer[2] == 's') {
-                    state = 20; //Obrir portes de sortida
-                }else{
-                    state = 19; //tornem a mostrar reset system
-                }
-            }else if(index == 2) {
-                if(buffer[0] == 'N' && buffer[1] == 'o') {
-                    TI_ResetTics(t);
-                    state = 9; //Activar alarma
-                }else{
-                    state = 19; //tornem a mostrar reset system
-                }
-            }else{
-                state = 19;
+            } else {
+                i = 0;
+                state = 11;
             }
             break;
 
-        case 19:
-            enviaMissatge(FRASE_10);
-            index = 0;
-            state = 13;
+        case 10:
+            if (count_temps_animal[i] >= temps_animal[i]) {
+                count_temps_animal[i] = 0;
+                if (q_animals < MAX_ANIMALS_TOTAL) {
+                    k = 0;
+                    state = 20;
+                    break;
+                }
+            }
+            i++;
+            state = 9;
             break;
 
+        // Busca slot lliure per afegir animal d'especie i, un pas per crida
         case 20:
-            if(statusFiMissatge()){
-                enviaMissatge(FRASE_11);
-                TI_ResetTics(t);
-                state = 21;
+            if (afegirNouAnimal(i)) {
+                i++;
+                state = 9;
+            } else if (k >= MAX_ANIMALS_TOTAL) {
+                i++;
+                state = 9;
+            } else {
+                k++;
             }
             break;
 
-        case 21:
-            if(TI_GetTics(t) >= 4000) {
-                SPEAKER_startAgut();
-                enviaMissatge(FRASE_12);
-                TI_ResetTics(t);
-                state = 22;
+        // --- Cada segon: produccio, especie i ---
+        case 11:
+            if (i < NUM_ESPECIES) {
+                count_temps_producte[i]++;
+                state = 12;
+            } else {
+                i = 0;
+                state = 13;
             }
             break;
-            
-        case 22:
-            if(TI_GetTics(t) >= 1000) {
-                SPEAKER_stop();
-                state = 30;
+
+        case 12:
+            if (count_temps_producte[i] >= temps_producte[i]) {
+                count_temps_producte[i] = 0;
+                if (animals_desperts[i] > 0) {
+                    incrementarProductes(i);
+                }
+            }
+            i++;
+            state = 11;
+            break;
+
+        // --- Son critic global cada 2 minuts ---
+        case 13:
+            count_son++;
+            if (count_son >= TEMPS_SON) {
+                count_son = 0;
+                k = 0;
+                state = 14;
+            } else {
+                state = 0;
             }
             break;
-            
-            
-        case 30:
-            if(statusFiMissatge()) {
-                enviaMissatge(FRASE_13);
-                state = 0; //nova linia i reset system
+
+        // Posa animals a son critic, un per crida
+        case 14:
+            if (posarAnimalsASon()) {
+                // continua fins k >= MAX_ANIMALS_TOTAL
+            } else {
+                state = 0;
             }
             break;
     }
