@@ -33,6 +33,13 @@
 #define RSP_SLEEP_OK         'Y'
 #define RSP_SLEEP_NOK        'N'
 
+// Navegacio joystick (PIC -> Java)
+#define RSP_MOVE_UP          'U'
+#define RSP_MOVE_DOWN        'D'
+#define RSP_MOVE_LEFT        'L'
+#define RSP_MOVE_RIGHT       'G'   // 'R' ja es RESET
+#define RSP_SELECT           'X'
+
 // Estats animal per al protocol (text)
 #define TXT_SLEEP   "SLEEP"
 #define TXT_AWAKE   "AWAKE"
