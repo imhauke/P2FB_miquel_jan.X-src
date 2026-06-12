@@ -11,9 +11,36 @@
 #include "tad_validador.h"
 #include "tad_hora.h"
 #include "tad_eeprom.h"
+#include "tad_manager_sio.h"
 
-// Comandament d'inicialitzacio (ha de coincidir amb FarmConstants.CMD_INITIALIZE)
-#define CMD_INITIALIZE  'I'
+// resp[] ha de ser prou gran per "P 255$255$255$255\r\n\0"
+
+// --- Protocol Java -> PIC (1 char per comanda) ---
+#define CMD_INITIALIZE       'I'
+#define CMD_GET_ANIMALS      'A'
+#define CMD_GET_PRODUCTS     'P'
+#define CMD_CONSUME          'C'
+#define CMD_RESET            'R'
+#define CMD_START_REBELLION  'B'
+#define CMD_STOP_REBELLION   'E'
+#define CMD_SLEEP            'S'
+
+// --- Protocol PIC -> Java (1 char per resposta) ---
+#define RSP_DATA_PRODUCTS    'P'
+#define RSP_DATA_ANIMAL      'A'
+#define RSP_FINISH           'F'
+#define RSP_SLEEP_OK         'Y'
+#define RSP_SLEEP_NOK        'N'
+
+// Estats animal per al protocol (text)
+#define TXT_SLEEP   "SLEEP"
+#define TXT_AWAKE   "AWAKE"
+
+// Noms d'especie per al protocol Java (tipus 1..4)
+#define PROTO_VACA      "VACA"
+#define PROTO_CAVALL    "CAVALL"
+#define PROTO_PORC      "PORC"
+#define PROTO_GALLINA   "GALLINA"
 
 // Especies: [0]=vaca [1]=cavall [2]=porc [3]=gallina
 #define NUM_ESPECIES        4

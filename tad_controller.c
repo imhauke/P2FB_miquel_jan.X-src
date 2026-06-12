@@ -24,6 +24,9 @@ static char animals[NUM_ESPECIES];
 static char animals_desperts[NUM_ESPECIES];
 static char q_animals;
 static char productes[NUM_ESPECIES];
+static char flag_rebellio;
+
+static char resp[24];     // buffer per construir respostes a Java
 
 static unsigned char t;
 
@@ -31,6 +34,7 @@ static unsigned char t;
 void initController(void) {
     flag_init = 0;
     flag_comptatge = 0;
+    flag_rebellio = 0;
     i = 0; j = 0; k = 0;
     q_animals = 0;
 
@@ -96,6 +100,21 @@ static char unitats(char n) {
     if (n >= 20) return n - 20;
     if (n >= 10) return n - 10;
     return n;
+}
+
+// --- Escriu un numero (0..255) a resp[p..]; retorna la nova posicio ---
+static char posaNum(char p, char n) {
+    char cent = 0;
+    if (n >= 200) { cent = 2; n -= 200; }
+    else if (n >= 100) { cent = 1; n -= 100; }
+    if (cent > 0) {
+        resp[p++] = '0' + cent;
+        resp[p++] = '0' + desenes(n);
+    } else if (n >= 10) {
+        resp[p++] = '0' + desenes(n);
+    }
+    resp[p++] = '0' + unitats(n);
+    return p;
 }
 
 // --- Auxiliars parser INITIALIZE ---
@@ -169,6 +188,51 @@ static void incrementarProductes(char esp) {
     LCD_notifica(NOTIF_PRODUCTE, esp, productes[esp]);
 }
 
+// --- Construeix "P llet$pernil$ous$pinzells" a resp[] (resposta GET_PRODUCTS) ---
+// productes[]: [0]=llet [1]=pinzells [2]=pernil [3]=ous
+static void construeixProductes(void) {
+    char p = 0;
+    resp[p++] = RSP_DATA_PRODUCTS;
+    p = posaNum(p, productes[0]);   // llet
+    resp[p++] = '$';
+    p = posaNum(p, productes[2]);   // pernil
+    resp[p++] = '$';
+    p = posaNum(p, productes[3]);   // ous
+    resp[p++] = '$';
+    p = posaNum(p, productes[1]);   // pinzells
+    resp[p++] = '\r';
+    resp[p++] = '\n';
+    resp[p]   = '\0';
+}
+
+// --- RESET: buida la granja i torna a l'espera d'inicialitzacio ---
+static void ferReset(void) {
+    initController();   // reinicialitza tots els comptadors i arrays
+    // TODO: esborrar EEPROM
+}
+
+// --- CONSUME: descompta productes segons l'opcio escollida ---
+// Opcions (segons enunciat):
+//  0 = ou fregit          -> 1 ou
+//  1 = truita amb pernil  -> 1 ou + 1 pernil
+//  2 = cacaolat           -> 2 llets
+//  3 = pintura            -> 2 pinzells
+// productes[]: [0]=llet [1]=pinzells [2]=pernil [3]=ous
+static void ferConsume(char opcio) {
+    if (opcio == '0') {
+        if (productes[3] >= 1) productes[3] -= 1;
+    } else if (opcio == '1') {
+        if (productes[3] >= 1 && productes[2] >= 1) {
+            productes[3] -= 1;
+            productes[2] -= 1;
+        }
+    } else if (opcio == '2') {
+        if (productes[0] >= 2) productes[0] -= 2;
+    } else if (opcio == '3') {
+        if (productes[1] >= 2) productes[1] -= 2;
+    }
+}
+
 // --- Motor principal ---
 void motorController(void) {
     static char state = 0;
@@ -197,10 +261,29 @@ void motorController(void) {
 
         // Identifica comandament entrant
         case 1:
-            if (c == CMD_INITIALIZE) { 
-                i = 0; 
-                j = 0; 
+            if (c == CMD_INITIALIZE) {
+                i = 0; j = 0;
                 state = 2;
+            } else if (c == CMD_RESET) {
+                ferReset();
+                state = 0;
+            } else if (c == CMD_START_REBELLION) {
+                flag_rebellio = 1;
+                state = 0;
+            } else if (c == CMD_STOP_REBELLION) {
+                flag_rebellio = 0;
+                state = 0;
+            } else if (c == CMD_GET_PRODUCTS) {
+                state = 30;     // envia DATA_PRODUCTS
+            } else if (c == CMD_GET_ANIMALS) {
+                k = 0;
+                state = 40;     // envia llista d'animals + FINISH
+            } else if (c == CMD_CONSUME) {
+                state = 50;     // llegeix l'opcio
+            } else if (c == CMD_SLEEP) {
+                state = 60;     // llegeix TIPUS$NUM
+            } else {
+                state = 0;      // comanda desconeguda, ignora
             }
             break;
 
@@ -354,6 +437,34 @@ void motorController(void) {
                 // continua fins k >= MAX_ANIMALS_TOTAL
             } else {
                 state = 0;
+            }
+            break;
+
+        // === GET_PRODUCTS: envia "P llet$pernil$ous$pinzells\r\n" ===
+        case 30:
+            if (statusFiMissatge()) {
+                construeixProductes();
+                enviaMissatge(resp);
+                state = 0;
+            }
+            break;
+
+        // === CONSUME: llegeix l'opcio i descompta ===
+        case 50:
+            if (SiCharAvail()) {
+                c = SiGetChar();
+                if (c != '\r' && c != '\n') {
+                    ferConsume(c);
+                }
+                state = 51;
+            }
+            break;
+
+        // Consumeix la resta fins '\n'
+        case 51:
+            if (SiCharAvail()) {
+                c = SiGetChar();
+                if (c == '\n') state = 0;
             }
             break;
     }

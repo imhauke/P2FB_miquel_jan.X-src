@@ -5,6 +5,7 @@
 #include "tad_eeprom.h"
 #include "tad_validador.h"
 #include "tad_hora.h"
+#include "tad_manager_sio.h"
 
 
 #pragma config PBADEN = DIG
@@ -26,6 +27,7 @@ void main(void) {
     initSioAux();
     initValidador();
     initHora();
+    MNG_SIO_init();
     initController();
     initControllerAdc();
     initJoystick();
@@ -35,6 +37,7 @@ void main(void) {
         motorSioAux();
         motorValidador();
         motorHora();
+        MNG_SIO_motor();
         motorController();
         motorControllerAdc();
         motorJoystick();
