@@ -32,8 +32,10 @@ static char sleep_esp;    // especie de l'animal a dormir (SLEEP)
 static char sleep_num;    // numero de l'animal a dormir
 static unsigned char t_sleep;      // timer dels 5s d'espera LDR
 
-static char ee_addr;      // adreca base EEPROM de l'animal que dorm
+static char ee_addr;      // adreca base EEPROM de l'animal que dorm/llegeix
 static char ee_pas;       // pas dins l'escriptura dels 6 bytes
+static char flag_restaura; // 1 mentre s'esta llegint l'EEPROM a l'arrencada
+static char ee_tipus;     // tipus llegit d'un slot durant la restauracio
 
 static unsigned char t;
 
@@ -42,6 +44,7 @@ void initController(void) {
     flag_init = 0;
     flag_comptatge = 0;
     flag_rebellio = 0;
+    flag_restaura = 1;     // a l'arrencada, restaura animals des de l'EEPROM
     i = 0; j = 0; k = 0;
     q_animals = 0;
 
@@ -64,19 +67,6 @@ void initController(void) {
     animals_arr[15].tipus=0;    animals_arr[16].tipus=0;    animals_arr[17].tipus=0;
     animals_arr[18].tipus=0;    animals_arr[19].tipus=0;    animals_arr[20].tipus=0;
     animals_arr[21].tipus=0;    animals_arr[22].tipus=0;    animals_arr[23].tipus=0;
-    
-    
-    /*for (i = 0; i < NUM_ESPECIES; i++) {
-        animals[i] = 0;
-        animals_desperts[i] = 0;
-        count_temps_animal[i] = 0;
-        count_temps_producte[i] = 0;        //Solo mejora un 1%
-        productes[i] = 0;
-    }
-
-    for (i = 0; i < MAX_ANIMALS_TOTAL; i++) {
-        animals_arr[i].tipus = 0;
-    }*/
 
     TI_NewTimer(&t);
     TI_NewTimer(&t_sleep);
@@ -250,9 +240,10 @@ static void construeixAnimal(char num_especie) {
 
 // --- RESET: buida la granja i torna a l'espera d'inicialitzacio ---
 static void ferReset(void) {
-    initController();   // reinicialitza tots els comptadors i arrays
-    // Esborra l'EEPROM marcant 0 animals guardats (no cal netejar byte a byte:
-    // amb q_animals = 0 a l'arrencada no es llegira cap animal)
+    initController();      // reinicialitza tots els comptadors i arrays
+    flag_restaura = 0;     // un reset no ha de restaurar res
+    // Marca l'EEPROM com a buida (q_animals = 0 a l'adreca 0).
+    // A l'arrencada, si q_animals val 0 no es restaura cap animal.
     EE_writeByte(EE_ADDR_QANIM, 0);
 }
 
@@ -286,6 +277,13 @@ void motorController(void) {
 
         // Espera inicialitzacio completa (Java + hora serial)
         case 0:
+            // A l'arrencada, restaura primer els animals guardats a l'EEPROM
+            if (flag_restaura == 1) {
+                k = 0;
+                ee_addr = EE_ADDR_ANIMALS;
+                state = 80;
+                break;
+            }
             if (flag_init == 1 && V_isFlagOk() && flag_comptatge == 0) {
                 TI_ResetTics(t);
                 i = 0;
@@ -640,20 +638,22 @@ void motorController(void) {
             state = 68;
             break;
 
-        // Guarda 6 bytes a EEPROM (tipus, dia, mes, hora, min, seg), un per pas
+        // Guarda 7 bytes a EEPROM: marca q_animals i els 6 de l'animal, un per pas
         case 68:
             if (EE_busy()) break;   // espera que acabi l'escriptura anterior
             if (ee_pas == 0) {
-                EE_writeByte(ee_addr + EE_OFF_TIPUS, animals_arr[k].tipus);
+                EE_writeByte(EE_ADDR_QANIM, q_animals);  // marca que hi ha dades
             } else if (ee_pas == 1) {
-                EE_writeByte(ee_addr + EE_OFF_DIA,  HORA_getDia());
+                EE_writeByte(ee_addr + EE_OFF_TIPUS, animals_arr[k].tipus);
             } else if (ee_pas == 2) {
-                EE_writeByte(ee_addr + EE_OFF_MES,  HORA_getMes());
+                EE_writeByte(ee_addr + EE_OFF_DIA,  HORA_getDia());
             } else if (ee_pas == 3) {
-                EE_writeByte(ee_addr + EE_OFF_HORA, HORA_getHora());
+                EE_writeByte(ee_addr + EE_OFF_MES,  HORA_getMes());
             } else if (ee_pas == 4) {
-                EE_writeByte(ee_addr + EE_OFF_MIN,  HORA_getMinut());
+                EE_writeByte(ee_addr + EE_OFF_HORA, HORA_getHora());
             } else if (ee_pas == 5) {
+                EE_writeByte(ee_addr + EE_OFF_MIN,  HORA_getMinut());
+            } else if (ee_pas == 6) {
                 EE_writeByte(ee_addr + EE_OFF_SEG,  HORA_getSegon());
             } else {
                 state = 69;     // tots escrits
@@ -676,6 +676,38 @@ void motorController(void) {
                 enviaMissatge(RSP_SLEEP_NOK_STR);
                 state = 0;
             }
+            break;
+
+        // === RESTAURACIO EEPROM: comprova si hi ha dades guardades ===
+        case 80:
+            // q_animals invalid (0 o > maxim) -> EEPROM buida, no restaura res
+            if (EE_readByte(EE_ADDR_QANIM) == 0 ||
+                EE_readByte(EE_ADDR_QANIM) > MAX_ANIMALS_TOTAL) {
+                flag_restaura = 0;
+                state = 0;
+            } else {
+                state = 81;
+            }
+            break;
+
+        // Recorre els 24 slots; restaura els que tinguin un tipus valid (1..4)
+        case 81:
+            if (k >= MAX_ANIMALS_TOTAL) {
+                flag_restaura = 0;
+                state = 0;
+                break;
+            }
+            ee_tipus = EE_readByte(ee_addr + EE_OFF_TIPUS);
+            if (ee_tipus >= 1 && ee_tipus <= NUM_ESPECIES) {
+                animals_arr[k].tipus   = ee_tipus;
+                animals_arr[k].despert = 1;     // arrenca despert
+                animals_arr[k].count_son = 0;
+                animals[ee_tipus - 1]++;
+                animals_desperts[ee_tipus - 1]++;
+                q_animals++;
+            }
+            k++;
+            ee_addr += EE_BYTES_ANIMAL;
             break;
     }
 }

@@ -3,7 +3,7 @@
 static char flag_right, flag_left;
 static char flag_up, flag_down;
 static char pos;
-unsigned char ldr_value;
+static unsigned char ldr_value;
 static char flag_fosc;
 
 void initControllerAdc(void) {
