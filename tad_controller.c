@@ -4,61 +4,86 @@
 #define MAX_BUFFER  3
 
 // --- Variables privades ---
-static char nom_granja[32];
+static char linia1[17];   // nom granja + '\0'  (16 chars + terminador)
+static char linia2[17];   // " DD/MM/2026" o el que vulguis + '\0'
 static char buffer[MAX_BUFFER];
 static char c;
 static char i, j, k;
 static char flag_init, flag_comptatge;
 
-static char           temps_animal[NUM_ESPECIES];
-static char           temps_decimal;
-static char           count_temps_animal[NUM_ESPECIES];
-static char           count_temps_producte[NUM_ESPECIES];
-static const char     temps_producte[NUM_ESPECIES] = {
+static char temps_animal[NUM_ESPECIES];
+static char temps_decimal;
+static char count_temps_animal[NUM_ESPECIES];
+static char count_temps_producte[NUM_ESPECIES];
+static const char temps_producte[NUM_ESPECIES] = {
     TEMPS_PROD_VACA, TEMPS_PROD_CAVALL, TEMPS_PROD_PORC, TEMPS_PROD_GALLINA
 };
 
 static Animal animals_arr[MAX_ANIMALS_TOTAL];
-static char   animals[NUM_ESPECIES];
-static char   animals_desperts[NUM_ESPECIES];
-static char   q_animals;
-static char   productes[NUM_ESPECIES];
+static char animals[NUM_ESPECIES];
+static char animals_desperts[NUM_ESPECIES];
+static char q_animals;
+static char productes[NUM_ESPECIES];
 
 static unsigned char t;
 
 // --- Init ---
 void initController(void) {
-    flag_init      = 0;
+    flag_init = 0;
     flag_comptatge = 0;
     i = 0; j = 0; k = 0;
     q_animals = 0;
 
-    animals[0] = 0;          animals[1] = 0;
-    animals[2] = 0;          animals[3] = 0;
-    animals_desperts[0] = 0; animals_desperts[1] = 0;
-    animals_desperts[2] = 0; animals_desperts[3] = 0;
+    animals[0] = 0; animals[1] = 0;
+    animals[2] = 0; animals[3] = 0;
+    animals_desperts[0] = 0;    animals_desperts[1] = 0;
+    animals_desperts[2] = 0;    animals_desperts[3] = 0;
     count_temps_animal[0] = 0;  count_temps_animal[1] = 0;
     count_temps_animal[2] = 0;  count_temps_animal[3] = 0;
-    count_temps_producte[0] = 0; count_temps_producte[1] = 0;
-    count_temps_producte[2] = 0; count_temps_producte[3] = 0;
-    productes[0] = 0; productes[1] = 0;
-    productes[2] = 0; productes[3] = 0;
+    count_temps_producte[0] = 0;    count_temps_producte[1] = 0;
+    count_temps_producte[2] = 0;    count_temps_producte[3] = 0;
+    productes[0] = 0;   productes[1] = 0;
+    productes[2] = 0;   productes[3] = 0;
 
-    animals_arr[0].tipus=0;  animals_arr[1].tipus=0;  animals_arr[2].tipus=0;
-    animals_arr[3].tipus=0;  animals_arr[4].tipus=0;  animals_arr[5].tipus=0;
-    animals_arr[6].tipus=0;  animals_arr[7].tipus=0;  animals_arr[8].tipus=0;
-    animals_arr[9].tipus=0;  animals_arr[10].tipus=0; animals_arr[11].tipus=0;
-    animals_arr[12].tipus=0; animals_arr[13].tipus=0; animals_arr[14].tipus=0;
-    animals_arr[15].tipus=0; animals_arr[16].tipus=0; animals_arr[17].tipus=0;
-    animals_arr[18].tipus=0; animals_arr[19].tipus=0; animals_arr[20].tipus=0;
-    animals_arr[21].tipus=0; animals_arr[22].tipus=0; animals_arr[23].tipus=0;
+    animals_arr[0].tipus=0; animals_arr[1].tipus=0; animals_arr[2].tipus=0;
+    animals_arr[3].tipus=0; animals_arr[4].tipus=0; animals_arr[5].tipus=0;
+    animals_arr[6].tipus=0; animals_arr[7].tipus=0; animals_arr[8].tipus=0;
+    animals_arr[9].tipus=0; animals_arr[10].tipus=0;    animals_arr[11].tipus=0;
+    animals_arr[12].tipus=0;    animals_arr[13].tipus=0;    animals_arr[14].tipus=0;
+    animals_arr[15].tipus=0;    animals_arr[16].tipus=0;    animals_arr[17].tipus=0;
+    animals_arr[18].tipus=0;    animals_arr[19].tipus=0;    animals_arr[20].tipus=0;
+    animals_arr[21].tipus=0;    animals_arr[22].tipus=0;    animals_arr[23].tipus=0;
+    
+    
+    /*for (i = 0; i < NUM_ESPECIES; i++) {
+        animals[i] = 0;
+        animals_desperts[i] = 0;
+        count_temps_animal[i] = 0;
+        count_temps_producte[i] = 0;        //Solo mejora un 1%
+        productes[i] = 0;
+    }
+
+    for (i = 0; i < MAX_ANIMALS_TOTAL; i++) {
+        animals_arr[i].tipus = 0;
+    }*/
 
     TI_NewTimer(&t);
 }
 
+char V_isFlagOk(void) {
+    return 0;
+}
+
+char V_getData(char pos) {
+    return 0;
+}
+
 // --- Auxiliars parser INITIALIZE ---
 void guardaCaracterTemps(void) {
-    if (c != '\r') { buffer[i] = c; i++; }
+    if (c != '\r') {
+        buffer[i] = c;
+        i++;
+    }
 }
 
 void ferItoaTemps(void) {
@@ -78,25 +103,38 @@ void guardaTempsAnimal(void) {
 
 // --- Afegeix un animal d'especie esp al slot k (un pas, sense bucle) ---
 static char afegirNouAnimal(char esp) {
-    if (q_animals >= MAX_ANIMALS_TOTAL) return 0;
-    if (animals_arr[k].tipus != 0)      return 0; // slot ocupat
-    animals_arr[k].tipus     = esp + 1;
-    animals_arr[k].despert   = 1;
-    animals_arr[k].count_son = 0;   // comenca a comptar els seus 2 min
+    if (q_animals >= MAX_ANIMALS_TOTAL) {
+        return 0;
+    }
+
+    if (animals_arr[k].tipus != 0) {   // slot ocupat
+        return 0;
+    }
+
+    animals_arr[k].tipus = esp + 1;
+    animals_arr[k].despert = 1;
+    animals_arr[k].count_son = 0;      // comença a comptar els seus 2 min
+
     animals[esp]++;
     animals_desperts[esp]++;
     q_animals++;
+
+    // Notifica al LCD: "Nou Animal <Tipus>: <num>"
+    LCD_notifica(NOTIF_ANIMAL, esp, animals[esp]);
+
     return 1;
 }
 
 // --- Compta el segon de l'animal k; si arriba a 2 min, son critic (un pas) ---
 static char posarAnimalsASon(void) {
-    if (k >= MAX_ANIMALS_TOTAL) return 0;
+    if (k >= MAX_ANIMALS_TOTAL) {
+        return 0;
+    }
     if (animals_arr[k].tipus != 0 && animals_arr[k].despert == 1) {
         animals_arr[k].count_son++;
         if (animals_arr[k].count_son >= TEMPS_SON) {
             animals_arr[k].count_son = 0;
-            animals_arr[k].despert   = 0;
+            animals_arr[k].despert = 0;
             animals_desperts[animals_arr[k].tipus - 1]--;
         }
     }
@@ -107,6 +145,8 @@ static char posarAnimalsASon(void) {
 // --- Incrementa productes de l'especie i ---
 static void incrementarProductes(char esp) {
     productes[esp] += animals_desperts[esp];
+    // Notifica al LCD: "Nou Producte <Tipus>: <total>"
+    LCD_notifica(NOTIF_PRODUCTE, esp, productes[esp]);
 }
 
 // --- Motor principal ---
@@ -117,7 +157,7 @@ void motorController(void) {
 
         // Espera inicialitzacio completa (Java + hora serial)
         case 0:
-            if (flag_init == 1 && V_isFlagOk()) {
+            if (flag_init == 1 && V_isFlagOk() && flag_comptatge == 0) {
                 TI_ResetTics(t);
                 i = 0;
                 state = 7;
@@ -151,21 +191,20 @@ void motorController(void) {
                 state = 3; 
             }
             break;
-
+        
         case 3:
             if (c != '$') {
                 if (i < MAX_NOM) { 
-                    nom_granja[i] = c; 
+                    linia1[i] = c;
                     i++; 
                 }
                 state = 2;
             } else {
-                nom_granja[i] = '\0';
+                linia1[i] = '\0';
                 i = 0;
                 state = 4;
             }
             break;
-
         // Llegeix 4 temps de generacio
         case 4:
             if (j < NUM_ESPECIES) { 
@@ -199,28 +238,33 @@ void motorController(void) {
             }
             break;
 
-        // Copia data al LCD
+        // Construeix linia 2 amb la data i dispara els dos prints
         case 7:
-            if (i < 5) {
-                nom_granja[i + 16] = V_getData(i);
-                i++;
-            } else {
-                i = 0;
-                state = 8;
-            }
-            break;
+            // Linia 2: " DD/MM/2026" (11 chars). Ajusta segons V_getData()
+            linia2[0]  = ' ';
+            linia2[1]  = V_getData(0);   // D
+            linia2[2]  = V_getData(1);   // D
+            linia2[3]  = '/';
+            linia2[4]  = V_getData(2);   // M
+            linia2[5]  = V_getData(3);   // M
+            linia2[6]  = '/';
+            linia2[7]  = '2';
+            linia2[8]  = '0';
+            linia2[9]  = '2';
+            linia2[10] = '6';
+            linia2[11] = '\0';
 
-        // Imprimeix nom_granja al LCD caracter a caracter
+            LCD_print(linia1);
+            LCD_print2(linia2);
+            state = 8;
+            break;
+        // Espera que el manager hagi acabat de pintar les dues linies
         case 8:
-            if (i < 32) {
-                LcPutChar(nom_granja[i]);
-                i++;
-            } else {
+            if (LCD_flag1() == 0 && LCD_flag2() == 0) {
                 flag_comptatge = 1;
                 state = 0;
             }
             break;
-
         // --- Cada segon: generacio animals, especie i ---
         case 9:
             if (i < NUM_ESPECIES) {

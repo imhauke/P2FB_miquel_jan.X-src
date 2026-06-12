@@ -28,11 +28,6 @@
 // 1 segon en tics (1 tic = 0.5ms @ 40MHz -> 2000 tics = 1s)
 #define SEGON               2000
 
-// Wrappers canal Java (EUSART hardware)
-#define SiCharAvail()       SIO_byteAvailable()
-#define SiGetChar()         SIO_byteGet()
-#define SiSendByte(x)       { while(!SIO_txReady()); SIO_sendByte(x); }
-
 typedef struct {
     char tipus;     // 1=vaca 2=cavall 3=porc 4=gallina (0=slot buit)
     char despert;   // 1=despert, 0=son critic
@@ -44,9 +39,5 @@ void motorController(void);
 void guardaCaracterTemps(void);
 void ferItoaTemps(void);
 void guardaTempsAnimal(void);
-
-// Oferts pel TAD Validador (sio_manual)
-char V_isFlagOk(void);
-char V_getData(char idx);
 
 #endif
