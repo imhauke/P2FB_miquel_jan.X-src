@@ -2,6 +2,10 @@
 // cambiar codigo usando numero diferente de variables, definidas de forma diferente, nombres diferentes, usar consatntes con defin,
 //  y cambiar logica de flags e ifs, añadidendo mas o menos, y o juntando cosas en un mismo tad
 
+#include "tad_eeprom.h"
+#include "tad_validador.h"
+#include "tad_hora.h"
+
 
 #pragma config PBADEN = DIG
 #pragma config WDT = OFF
@@ -20,15 +24,21 @@ void __interrupt() RSI_HIGH(void) {
 void main(void) {
     TI_Init();
     initSioAux();
+    initValidador();
+    initHora();
     initController();
     initControllerAdc();
     initJoystick();
     initLDR();
+    initEeprom();
     while (1) {
         motorSioAux();
+        motorValidador();
+        motorHora();
         motorController();
         motorControllerAdc();
         motorJoystick();
         motorLDR();
+        motorEeprom();
     }
 }

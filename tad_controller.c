@@ -70,12 +70,32 @@ void initController(void) {
     TI_NewTimer(&t);
 }
 
-char V_isFlagOk(void) {
-    return 0;
+// --- Descompon un numero 0..99 en desenes/unitats (sense divisions) ---
+static char desenes(char n) {
+    char d = 0;
+    if (n >= 90) return 9;
+    if (n >= 80) return 8;
+    if (n >= 70) return 7;
+    if (n >= 60) return 6;
+    if (n >= 50) return 5;
+    if (n >= 40) return 4;
+    if (n >= 30) return 3;
+    if (n >= 20) return 2;
+    if (n >= 10) return 1;
+    return d;
 }
 
-char V_getData(char pos) {
-    return 0;
+static char unitats(char n) {
+    if (n >= 90) return n - 90;
+    if (n >= 80) return n - 80;
+    if (n >= 70) return n - 70;
+    if (n >= 60) return n - 60;
+    if (n >= 50) return n - 50;
+    if (n >= 40) return n - 40;
+    if (n >= 30) return n - 30;
+    if (n >= 20) return n - 20;
+    if (n >= 10) return n - 10;
+    return n;
 }
 
 // --- Auxiliars parser INITIALIZE ---
@@ -238,15 +258,15 @@ void motorController(void) {
             }
             break;
 
-        // Construeix linia 2 amb la data i dispara els dos prints
+        // Construeix linia 2 amb la data (font unica: TAD Hora) i dispara prints
         case 7:
-            // Linia 2: " DD/MM/2026" (11 chars). Ajusta segons V_getData()
+            // Linia 2: " DD/MM/2026" (11 chars). Llegim del TAD Hora.
             linia2[0]  = ' ';
-            linia2[1]  = V_getData(0);   // D
-            linia2[2]  = V_getData(1);   // D
+            linia2[1]  = '0' + desenes(HORA_getDia());
+            linia2[2]  = '0' + unitats(HORA_getDia());
             linia2[3]  = '/';
-            linia2[4]  = V_getData(2);   // M
-            linia2[5]  = V_getData(3);   // M
+            linia2[4]  = '0' + desenes(HORA_getMes());
+            linia2[5]  = '0' + unitats(HORA_getMes());
             linia2[6]  = '/';
             linia2[7]  = '2';
             linia2[8]  = '0';

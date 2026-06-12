@@ -8,6 +8,9 @@
 #include "timer.h"
 #include "tad_controller_adc.h"
 #include "tad_sio_manual.h"
+#include "tad_validador.h"
+#include "tad_hora.h"
+#include "tad_eeprom.h"
 
 // Comandament d'inicialitzacio (ha de coincidir amb FarmConstants.CMD_INITIALIZE)
 #define CMD_INITIALIZE  'I'
