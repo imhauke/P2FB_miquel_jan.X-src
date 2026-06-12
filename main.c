@@ -6,6 +6,7 @@
 #include "tad_validador.h"
 #include "tad_hora.h"
 #include "tad_manager_sio.h"
+#include "tad_heartbeat.h"
 
 
 #pragma config PBADEN = DIG
@@ -33,6 +34,7 @@ void main(void) {
     initJoystick();
     initLDR();
     initEeprom();
+    initHeartbeat();
     while (1) {
         motorSioAux();
         motorValidador();
@@ -43,5 +45,6 @@ void main(void) {
         motorJoystick();
         motorLDR();
         motorEeprom();
+        motorHeartbeat();
     }
 }

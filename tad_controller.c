@@ -27,6 +27,13 @@ static char productes[NUM_ESPECIES];
 static char flag_rebellio;
 
 static char resp[24];     // buffer per construir respostes a Java
+static char cnt_esp[NUM_ESPECIES]; // comptador per especie en enviar animals
+static char sleep_esp;    // especie de l'animal a dormir (SLEEP)
+static char sleep_num;    // numero de l'animal a dormir
+static unsigned char t_sleep;      // timer dels 5s d'espera LDR
+
+static char ee_addr;      // adreca base EEPROM de l'animal que dorm
+static char ee_pas;       // pas dins l'escriptura dels 6 bytes
 
 static unsigned char t;
 
@@ -72,6 +79,7 @@ void initController(void) {
     }*/
 
     TI_NewTimer(&t);
+    TI_NewTimer(&t_sleep);
 }
 
 // --- Descompon un numero 0..99 en desenes/unitats (sense divisions) ---
@@ -205,10 +213,47 @@ static void construeixProductes(void) {
     resp[p]   = '\0';
 }
 
+// --- Copia el nom de l'especie (tipus 1..4) a resp[p..]; retorna nova posicio ---
+// Sense bucles: assignacions explicites per especie.
+static char posaEspecie(char p, char tipus) {
+    if (tipus == 1) {            // VACA
+        resp[p++]='V'; resp[p++]='A'; resp[p++]='C'; resp[p++]='A';
+    } else if (tipus == 2) {     // CAVALL
+        resp[p++]='C'; resp[p++]='A'; resp[p++]='V';
+        resp[p++]='A'; resp[p++]='L'; resp[p++]='L';
+    } else if (tipus == 3) {     // PORC
+        resp[p++]='P'; resp[p++]='O'; resp[p++]='R'; resp[p++]='C';
+    } else {                     // GALLINA
+        resp[p++]='G'; resp[p++]='A'; resp[p++]='L'; resp[p++]='L';
+        resp[p++]='I'; resp[p++]='N'; resp[p++]='A';
+    }
+    return p;
+}
+
+// --- Construeix "A <ESPECIE>$<num>$<estat>\r\n" a resp[] per l'animal del slot k ---
+static void construeixAnimal(char num_especie) {
+    char p = 0;
+    resp[p++] = RSP_DATA_ANIMAL;
+    p = posaEspecie(p, animals_arr[k].tipus);
+    resp[p++] = '$';
+    p = posaNum(p, num_especie);
+    resp[p++] = '$';
+    if (animals_arr[k].despert == 1) {
+        resp[p++]='A'; resp[p++]='W'; resp[p++]='A'; resp[p++]='K'; resp[p++]='E';
+    } else {
+        resp[p++]='S'; resp[p++]='L'; resp[p++]='E'; resp[p++]='E'; resp[p++]='P';
+    }
+    resp[p++] = '\r';
+    resp[p++] = '\n';
+    resp[p]   = '\0';
+}
+
 // --- RESET: buida la granja i torna a l'espera d'inicialitzacio ---
 static void ferReset(void) {
     initController();   // reinicialitza tots els comptadors i arrays
-    // TODO: esborrar EEPROM
+    // Esborra l'EEPROM marcant 0 animals guardats (no cal netejar byte a byte:
+    // amb q_animals = 0 a l'arrencada no es llegira cap animal)
+    EE_writeByte(EE_ADDR_QANIM, 0);
 }
 
 // --- CONSUME: descompta productes segons l'opcio escollida ---
@@ -269,9 +314,11 @@ void motorController(void) {
                 state = 0;
             } else if (c == CMD_START_REBELLION) {
                 flag_rebellio = 1;
+                HB_stop();          // apaga el heartbeat durant la rebel.lio
                 state = 0;
             } else if (c == CMD_STOP_REBELLION) {
                 flag_rebellio = 0;
+                HB_start();         // restableix el heartbeat
                 state = 0;
             } else if (c == CMD_GET_PRODUCTS) {
                 state = 30;     // envia DATA_PRODUCTS
@@ -449,6 +496,38 @@ void motorController(void) {
             }
             break;
 
+        // === GET_ANIMALS: prepara comptadors per especie ===
+        case 40:
+            cnt_esp[0] = 0; cnt_esp[1] = 0;
+            cnt_esp[2] = 0; cnt_esp[3] = 0;
+            k = 0;
+            state = 41;
+            break;
+
+        // Recorre els 24 slots; per cada animal ocupat envia una linia
+        case 41:
+            if (k >= MAX_ANIMALS_TOTAL) {
+                state = 42;     // tots enviats, toca el FINISH
+            } else if (animals_arr[k].tipus == 0) {
+                k++;            // slot buit, seguent
+            } else if (statusFiMissatge()) {
+                // animal ocupat: construeix i envia la seva linia
+                char esp = animals_arr[k].tipus - 1;
+                construeixAnimal(cnt_esp[esp]);
+                cnt_esp[esp]++;
+                enviaMissatge(resp);
+                k++;
+            }
+            break;
+
+        // Envia FINISH
+        case 42:
+            if (statusFiMissatge()) {
+                enviaMissatge(RSP_FINISH_STR);
+                state = 0;
+            }
+            break;
+
         // === CONSUME: llegeix l'opcio i descompta ===
         case 50:
             if (SiCharAvail()) {
@@ -465,6 +544,122 @@ void motorController(void) {
             if (SiCharAvail()) {
                 c = SiGetChar();
                 if (c == '\n') state = 0;
+            }
+            break;
+
+        // === SLEEP: llegeix la primera lletra (especie) ===
+        case 60:
+            if (SiCharAvail()) {
+                c = SiGetChar();
+                if (c == 'V')      sleep_esp = 0;  // VACA
+                else if (c == 'C') sleep_esp = 1;  // CAVALL
+                else if (c == 'P') sleep_esp = 2;  // PORC
+                else               sleep_esp = 3;  // GALLINA
+                state = 61;
+            }
+            break;
+
+        // Descarta la resta del nom fins '$'
+        case 61:
+            if (SiCharAvail()) {
+                c = SiGetChar();
+                if (c == '$') state = 62;
+            }
+            break;
+
+        // Llegeix el numero d'animal (1 digit, fins '\r' o '\n')
+        case 62:
+            if (SiCharAvail()) {
+                c = SiGetChar();
+                if (c >= '0' && c <= '9') {
+                    sleep_num = c - '0';
+                } else if (c == '\n') {
+                    TI_ResetTics(t_sleep);
+                    state = 63;     // espera fins a 5s que es tapi l'LDR
+                }
+            }
+            break;
+
+        // Espera que l'LDR detecti foscor en menys de 5 segons
+        case 63:
+            if (CJ_hiHaFosc()) {
+                state = 64;         // ha dormit: marca'l i respon OK
+            } else if (TI_GetTics(t_sleep) >= TICKS_5S) {
+                state = 65;         // timeout: respon NOK
+            }
+            break;
+
+        // Cerca el slot de l'animal (especie sleep_esp, index sleep_num)
+        case 64:
+            k = 0;
+            j = 0;                  // comptador d'animals de l'especie trobats
+            ee_addr = EE_ADDR_ANIMALS; // acumula l'adreca base mentre recorre
+            state = 66;
+            break;
+
+        case 66:
+            if (k >= MAX_ANIMALS_TOTAL) {
+                state = 65;     // no trobat (no hauria de passar) -> NOK
+            } else if (animals_arr[k].tipus == sleep_esp + 1) {
+                if (j == sleep_num) {
+                    state = 67; // trobat!
+                } else {
+                    j++;
+                    k++;
+                    ee_addr += EE_BYTES_ANIMAL;
+                }
+            } else {
+                k++;
+                ee_addr += EE_BYTES_ANIMAL;
+            }
+            break;
+
+        // Marca l'animal dormit i comenca a guardar el timestamp a EEPROM
+        case 67:
+            if (animals_arr[k].despert == 1) {
+                animals_arr[k].despert = 0;
+                animals_desperts[sleep_esp]--;
+            }
+            animals_arr[k].count_son = 0;   // reinicia el seu cicle de son
+            ee_pas = 0;
+            state = 68;
+            break;
+
+        // Guarda 6 bytes a EEPROM (tipus, dia, mes, hora, min, seg), un per pas
+        case 68:
+            if (EE_busy()) break;   // espera que acabi l'escriptura anterior
+            if (ee_pas == 0) {
+                EE_writeByte(ee_addr + EE_OFF_TIPUS, animals_arr[k].tipus);
+            } else if (ee_pas == 1) {
+                EE_writeByte(ee_addr + EE_OFF_DIA,  HORA_getDia());
+            } else if (ee_pas == 2) {
+                EE_writeByte(ee_addr + EE_OFF_MES,  HORA_getMes());
+            } else if (ee_pas == 3) {
+                EE_writeByte(ee_addr + EE_OFF_HORA, HORA_getHora());
+            } else if (ee_pas == 4) {
+                EE_writeByte(ee_addr + EE_OFF_MIN,  HORA_getMinut());
+            } else if (ee_pas == 5) {
+                EE_writeByte(ee_addr + EE_OFF_SEG,  HORA_getSegon());
+            } else {
+                state = 69;     // tots escrits
+                break;
+            }
+            ee_pas++;
+            break;
+
+        // Respon Y quan ha acabat l'EEPROM
+        case 69:
+            if (!EE_busy() && statusFiMissatge()) {
+                enviaMissatge(RSP_SLEEP_OK_STR);
+                state = 0;
+            }
+            break;
+
+        // No ha pogut dormir: respon N
+        case 65:
+            if (statusFiMissatge()) {
+                enviaMissatge(RSP_SLEEP_NOK_STR);
+                state = 0;
             }
             break;
     }

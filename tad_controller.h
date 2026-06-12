@@ -12,6 +12,7 @@
 #include "tad_hora.h"
 #include "tad_eeprom.h"
 #include "tad_manager_sio.h"
+#include "tad_heartbeat.h"
 
 // resp[] ha de ser prou gran per "P 255$255$255$255\r\n\0"
 
@@ -57,6 +58,8 @@
 
 // 1 segon en tics (1 tic = 0.5ms @ 40MHz -> 2000 tics = 1s)
 #define SEGON               2000
+// 5 segons (espera per tapar l'LDR)
+#define TICKS_5S            10000
 
 typedef struct {
     char tipus;     // 1=vaca 2=cavall 3=porc 4=gallina (0=slot buit)
