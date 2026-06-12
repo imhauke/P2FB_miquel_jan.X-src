@@ -1,4 +1,4 @@
-#include "tad_sio_aux.h"
+#include "tad_sio_manual.h"
 
 static char start_tx;
 static char byteTx, i, j, byteRx, flag_byte_available;

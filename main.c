@@ -1,4 +1,3 @@
-
 // cambiar codigo usando numero diferente de variables, definidas de forma diferente, nombres diferentes, usar consatntes con defin,
 //  y cambiar logica de flags e ifs, añadidendo mas o menos, y o juntando cosas en un mismo tad
 
@@ -8,6 +7,10 @@
 #include "tad_manager_sio.h"
 #include "tad_heartbeat.h"
 #include "tad_pulsador.h"
+#include "tad_controller.h"
+#include "tad_controller_adc.h"
+#include "tad_joystick.h"
+#include "tad_ldr.h"
 
 
 #pragma config PBADEN = DIG
