@@ -7,6 +7,7 @@
 #include "tad_hora.h"
 #include "tad_manager_sio.h"
 #include "tad_heartbeat.h"
+#include "tad_pulsador.h"
 
 
 #pragma config PBADEN = DIG
@@ -32,6 +33,7 @@ void main(void) {
     initController();
     initControllerAdc();
     initJoystick();
+    initPulsador();
     initLDR();
     initEeprom();
     initHeartbeat();
@@ -43,6 +45,7 @@ void main(void) {
         motorController();
         motorControllerAdc();
         motorJoystick();
+        motorPulsador();
         motorLDR();
         motorEeprom();
         motorHeartbeat();

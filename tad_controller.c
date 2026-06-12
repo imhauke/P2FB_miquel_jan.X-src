@@ -301,6 +301,21 @@ void motorController(void) {
                 TI_ResetTics(t);
                 i = 0;
                 state = 9;
+                break;
+            }
+            // Comprova moviments del joystick i el polsador, i els envia a Java
+            if (statusFiMissatge()) {
+                if (CJ_hiHaUp()) {
+                    enviaMissatge(RSP_MOVE_UP_STR);
+                } else if (CJ_hiHaDown()) {
+                    enviaMissatge(RSP_MOVE_DOWN_STR);
+                } else if (CJ_hiHaLeft()) {
+                    enviaMissatge(RSP_MOVE_LEFT_STR);
+                } else if (CJ_hiHaRight()) {
+                    enviaMissatge(RSP_MOVE_RIGHT_STR);
+                } else if (CJ_hiHaSelect()) {
+                    enviaMissatge(RSP_SELECT_STR);
+                }
             }
             break;
 

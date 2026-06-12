@@ -91,3 +91,7 @@ char CJ_hiHaFosc(void) {
     flag_fosc = 0;
     return aux;
 }
+
+char CJ_hiHaSelect(void) {
+    return PULSADOR_hiHaSelect();   // delega al TAD pulsador
+}

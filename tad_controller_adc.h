@@ -4,6 +4,7 @@
 #include <xc.h>
 #include "tad_joystick.h"
 #include "tad_ldr.h"
+#include "tad_pulsador.h"
 
 
 void initControllerAdc(void);
@@ -13,5 +14,6 @@ char CJ_hiHaLeft(void);
 char CJ_hiHaUp(void);
 char CJ_hiHaDown(void);
 char CJ_hiHaFosc(void);
+char CJ_hiHaSelect(void);
 
 #endif

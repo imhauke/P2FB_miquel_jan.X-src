@@ -1,7 +1,7 @@
 #include "tad_joystick.h"
 
 static char start;
-static unsigned char resut_x, resut_y;
+static unsigned char result_x, result_y;
 static char posX, posY;
 static char flag_x, flag_y;
 static char flag_mig_x, flag_mig_y;
