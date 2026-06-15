@@ -1,6 +1,7 @@
 // cambiar codigo usando numero diferente de variables, definidas de forma diferente, nombres diferentes, usar consatntes con defin,
 //  y cambiar logica de flags e ifs, añadidendo mas o menos, y o juntando cosas en un mismo tad
 
+#include <xc.h>
 #include "tad_eeprom.h"
 #include "tad_validador.h"
 #include "tad_hora.h"
@@ -12,7 +13,7 @@
 #include "tad_joystick.h"
 #include "tad_ldr.h"
 
-
+#pragma config OSC = HSPLL
 #pragma config PBADEN = DIG
 #pragma config WDT = OFF
 #pragma config MCLRE = ON
