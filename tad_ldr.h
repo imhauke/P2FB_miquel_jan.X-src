@@ -3,6 +3,9 @@
 
 #include <xc.h>
 
+// LDR (sensor de llum) analogic: AN2 (RA2)
+#define TRIS_LDR   TRISAbits.TRISA2
+
 void initLDR(void);
 void motorLDR(void);
 

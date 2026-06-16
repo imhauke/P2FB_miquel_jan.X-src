@@ -4,7 +4,7 @@ static char start;
 static unsigned char value;
 
 void initLDR(void) {
-
+    TRIS_LDR = 1;       // AN2 entrada analogica
 }
 
 void motorLDR(void) {

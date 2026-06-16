@@ -3,6 +3,10 @@
 
 #include <xc.h>
 
+// Joystick analogic: eix X = AN0 (RA0), eix Y = AN1 (RA1)
+#define TRIS_JOY_X   TRISAbits.TRISA0
+#define TRIS_JOY_Y   TRISAbits.TRISA1
+
 void initJoystick(void);
 void motorJoystick(void);
 

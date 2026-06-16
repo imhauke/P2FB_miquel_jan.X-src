@@ -5,9 +5,9 @@
 #include "timer.h"
 
 // Polsador del joystick (o un polsador separat segons l'enunciat).
-// Digital amb pull-up: premut = 0. Pin RB1.
-#define TRIS_SW       TRISBbits.TRISB1
-#define PIN_SW        PORTBbits.RB1
+// Digital amb pull-up: premut = 0. Pin RB2.
+#define TRIS_SW       TRISBbits.TRISB2
+#define PIN_SW        PORTBbits.RB2
 #define SW_ANTIREBOT  40   // tics d'antirebot (40 x 0.5ms = 20ms)
 
 void initPulsador(void);

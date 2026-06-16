@@ -7,7 +7,8 @@ static char flag_x, flag_y;
 static char flag_mig_x, flag_mig_y;
 
 void initJoystick(void) {
-
+    TRIS_JOY_X = 1;     // AN0 entrada analogica
+    TRIS_JOY_Y = 1;     // AN1 entrada analogica
 }
 
 void selectChannel0(void) {

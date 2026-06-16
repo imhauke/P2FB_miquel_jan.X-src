@@ -9,10 +9,10 @@ static char* TreuTX(void);
 
 
 void SiInit(void){
-    TRISCbits.TRISC6 = 1;   // TX como entrada (controlado por UART)
-    TRISCbits.TRISC7 = 1;   // RX como entrada
+    TRIS_SIO_TX = 1;   // TX com a entrada (la controla l'EUSART)
+    TRIS_SIO_RX = 1;   // RX com a entrada
     
-    TXSTAbits.SYNC = 0;     // Modo asíncrono
+    TXSTAbits.SYNC = 0;     // Modo asï¿½ncrono
     TXSTAbits.BRGH = 1;     // High Speed
     BAUDCONbits.BRG16 = 1;  // Baud Rate Generator 16 bits
     
@@ -20,9 +20,9 @@ void SiInit(void){
     SPBRG  = 0x10;           // 9600 baudios @ 40MHz
     
     RCSTAbits.SPEN = 1;     // Habilitar puerto serial
-    TXSTAbits.TXEN = 1;     // Habilitar transmisión
+    TXSTAbits.TXEN = 1;     // Habilitar transmisiï¿½n
     TXSTAbits.SENDB = 0;
-    RCSTAbits.CREN = 1;     // Habilitar recepción continua
+    RCSTAbits.CREN = 1;     // Habilitar recepciï¿½n continua
     RCSTAbits.RX9 = 0;
 }
 
