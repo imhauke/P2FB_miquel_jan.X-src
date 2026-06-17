@@ -35,10 +35,7 @@
 //
 //---------------------------End--CONSTANTS---AREA-----------
 //
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// CHAT El timer de este proyecto hace tick cada 200 us -> 5 tics = 1 ms.
-// (La plantilla del ano pasado usaba un tick de 2 ms; por eso hay que
-//  convertir aqui los ms a tics, o el LCD no se inicializa bien.)
+//el timer genera un tic cada 200 us --> por tanto, 5 tics = 1 ms
 #define TICS_PER_MS     5
 //
 //--------------------------------VARIABLES---AREA-----------
@@ -111,7 +108,7 @@ void LcClear(void) {
 // Post: Erases the display and sets the cursor to its previous state. 
 // Post: The next order can last up to 1.6ms. 
 	WaitForBusy(); 	CantaIR(DISPLAY_CLEAR);	   //Spaces
-	Espera(Timer, 1); // V1.1 //cum3
+	Espera(Timer, 2); // V1.1
 }
 
 void LcCursorOn(void) {
@@ -205,9 +202,8 @@ void LcPutString(char *s) {
 //
 
 void Espera(unsigned char Timer, int ms) {
-	TI_ResetTics(Timer);
-	//while(TI_GetTics(Timer) < ms); original
-    while (TI_GetTics(Timer) < (unsigned long)ms * TICS_PER_MS); /////////////////////////////////////////////////////////////////////////////////////////////////////////
+    TI_ResetTics(Timer);
+    while(TI_GetTics(Timer) < (ms * TICS_PER_MS));
 }
 
 void CantaPartAlta(char c) {
@@ -256,7 +252,7 @@ void CantaData(char Data) {
 	SetD4_D7Entrada();
 }
 
-void WaitForBusy(void) { char Busy;
+void WaitForBusy(void) {     char Busy;
 	SetD4_D7Entrada();
 	RSDown();
 	RWUp();
@@ -270,8 +266,7 @@ void WaitForBusy(void) { char Busy;
 		// The lower part of the address counter, it is not interesting for us. 
 		EnableDown();
 		EnableDown();
-		//original if (TI_GetTics(Timer)) break; // More than one ms means that the LCD has gone mad.
-        if (TI_GetTics(Timer) >= 2 * TICS_PER_MS) break; //////////////////////////////////////////////////////////////////////////////////////////////////////////////
+		if (TI_GetTics(Timer) >= TICS_PER_MS) break; // More than one ms means that the LCD has gone mad.
 	} while(Busy);
 }
 
