@@ -36,6 +36,7 @@ static char ee_addr;      // adreca base EEPROM de l'animal que dorm/llegeix
 static char ee_pas;       // pas dins l'escriptura dels 6 bytes
 static char flag_restaura; // 1 mentre s'esta llegint l'EEPROM a l'arrencada
 static char ee_tipus;     // tipus llegit d'un slot durant la restauracio
+static char ee_total;     // nombre d'animals guardats a l'EEPROM (a restaurar)
 
 static unsigned char t;
 
@@ -59,14 +60,8 @@ void initController(void) {
     productes[0] = 0;   productes[1] = 0;
     productes[2] = 0;   productes[3] = 0;
 
-    animals_arr[0].tipus=0; animals_arr[1].tipus=0; animals_arr[2].tipus=0;
-    animals_arr[3].tipus=0; animals_arr[4].tipus=0; animals_arr[5].tipus=0;
-    animals_arr[6].tipus=0; animals_arr[7].tipus=0; animals_arr[8].tipus=0;
-    animals_arr[9].tipus=0; animals_arr[10].tipus=0;    animals_arr[11].tipus=0;
-    animals_arr[12].tipus=0;    animals_arr[13].tipus=0;    animals_arr[14].tipus=0;
-    animals_arr[15].tipus=0;    animals_arr[16].tipus=0;    animals_arr[17].tipus=0;
-    animals_arr[18].tipus=0;    animals_arr[19].tipus=0;    animals_arr[20].tipus=0;
-    animals_arr[21].tipus=0;    animals_arr[22].tipus=0;    animals_arr[23].tipus=0;
+    // Array compactat: els animals ocupen sempre [0..q_animals-1].
+    // No cal inicialitzar els 24 slots: q_animals = 0 ja indica granja buida.
 
     TI_NewTimer(&t);
     TI_NewTimer(&t_sleep);
@@ -138,19 +133,17 @@ void guardaTempsAnimal(void) {
     temps_animal[j] = temps_decimal;
 }
 
-// --- Afegeix un animal d'especie esp al slot k (un pas, sense bucle) ---
+// --- Afegeix un animal d'especie esp al final de l'array (compactat) ---
+// Array compactat: el nou animal va directe a animals_arr[q_animals],
+// sense buscar slots buits. Retorna 1 si s'ha afegit, 0 si la granja es plena.
 static char afegirNouAnimal(char esp) {
     if (q_animals >= MAX_ANIMALS_TOTAL) {
         return 0;
     }
 
-    if (animals_arr[k].tipus != 0) {   // slot ocupat
-        return 0;
-    }
-
-    animals_arr[k].tipus = esp + 1;
-    animals_arr[k].despert = 1;
-    animals_arr[k].count_son = 0;      // comença a comptar els seus 2 min
+    animals_arr[q_animals].tipus = esp + 1;
+    animals_arr[q_animals].despert = 1;
+    animals_arr[q_animals].count_son = 0;   // comença a comptar els seus 2 min
 
     animals[esp]++;
     animals_desperts[esp]++;
@@ -163,11 +156,12 @@ static char afegirNouAnimal(char esp) {
 }
 
 // --- Compta el segon de l'animal k; si arriba a 2 min, son critic (un pas) ---
+// Array compactat: recorre nomes [0..q_animals-1].
 static char posarAnimalsASon(void) {
-    if (k >= MAX_ANIMALS_TOTAL) {
+    if (k >= q_animals) {
         return 0;
     }
-    if (animals_arr[k].tipus != 0 && animals_arr[k].despert == 1) {
+    if (animals_arr[k].despert == 1) {
         animals_arr[k].count_son++;
         if (animals_arr[k].count_son >= TEMPS_SON) {
             animals_arr[k].count_son = 0;
@@ -442,25 +436,10 @@ void motorController(void) {
         case 10:
             if (count_temps_animal[i] >= temps_animal[i]) {
                 count_temps_animal[i] = 0;
-                k = 0;
-                state = 20;
-            } else {
-                i++;
-                state = 9;
+                afegirNouAnimal(i);     // array compactat: afegeix directe (o ignora si ple)
             }
-            break;
-
-        // Busca slot lliure per afegir animal d'especie i, un pas per crida
-        case 20:
-            if (afegirNouAnimal(i)) {
-                i++;
-                state = 9;
-            } else if (k >= MAX_ANIMALS_TOTAL) {
-                i++;
-                state = 9;
-            } else {
-                k++;
-            }
+            i++;
+            state = 9;
             break;
 
         // --- Cada segon: produccio, especie i ---
@@ -517,14 +496,11 @@ void motorController(void) {
             state = 41;
             break;
 
-        // Recorre els 24 slots; per cada animal ocupat envia una linia
+        // Recorre els animals [0..q_animals-1]; per cadascun envia una linia
         case 41:
-            if (k >= MAX_ANIMALS_TOTAL) {
+            if (k >= q_animals) {
                 state = 42;     // tots enviats, toca el FINISH
-            } else if (animals_arr[k].tipus == 0) {
-                k++;            // slot buit, seguent
             } else if (statusFiMissatge()) {
-                // animal ocupat: construeix i envia la seva linia
                 char esp = animals_arr[k].tipus - 1;
                 construeixAnimal(cnt_esp[esp]);
                 cnt_esp[esp]++;
@@ -611,7 +587,7 @@ void motorController(void) {
             break;
 
         case 66:
-            if (k >= MAX_ANIMALS_TOTAL) {
+            if (k >= q_animals) {
                 state = 65;     // no trobat (no hauria de passar) -> NOK
             } else if (animals_arr[k].tipus == sleep_esp + 1) {
                 if (j == sleep_num) {
@@ -681,8 +657,8 @@ void motorController(void) {
         // === RESTAURACIO EEPROM: comprova si hi ha dades guardades ===
         case 80:
             // q_animals invalid (0 o > maxim) -> EEPROM buida, no restaura res
-            if (EE_readByte(EE_ADDR_QANIM) == 0 ||
-                EE_readByte(EE_ADDR_QANIM) > MAX_ANIMALS_TOTAL) {
+            ee_total = EE_readByte(EE_ADDR_QANIM);
+            if (ee_total == 0 || ee_total > MAX_ANIMALS_TOTAL) {
                 flag_restaura = 0;
                 state = 0;
             } else {
@@ -690,9 +666,9 @@ void motorController(void) {
             }
             break;
 
-        // Recorre els 24 slots; restaura els que tinguin un tipus valid (1..4)
+        // Restaura els ee_total animals guardats (array compactat, [0..ee_total-1])
         case 81:
-            if (k >= MAX_ANIMALS_TOTAL) {
+            if (k >= ee_total) {
                 flag_restaura = 0;
                 state = 0;
                 break;
