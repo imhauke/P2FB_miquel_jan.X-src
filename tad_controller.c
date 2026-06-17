@@ -1,10 +1,10 @@
 #include "tad_controller.h"
 
 #define MAX_NOM    16
-#define MAX_BUFFER  3
+#define MAX_BUFFER  2
 
 // --- Variables privades ---
-static char linia1[17];   // nom granja + '\0'  (16 chars + terminador)
+static char linia1[16] = {"                "};   // nom granja  (16 chars + espais)
 static char linia2[17];   // " DD/MM/2026" o el que vulguis + '\0'
 static char buffer[MAX_BUFFER];
 static char c;
@@ -38,7 +38,11 @@ static char flag_restaura; // 1 mentre s'esta llegint l'EEPROM a l'arrencada
 static char ee_tipus;     // tipus llegit d'un slot durant la restauracio
 static char ee_total;     // nombre d'animals guardats a l'EEPROM (a restaurar)
 
+static char *str;
+
 static unsigned char t;
+static unsigned char t2;
+static char flag_puls;
 
 // --- Init ---
 void initController(void) {
@@ -65,6 +69,7 @@ void initController(void) {
 
     TI_NewTimer(&t);
     TI_NewTimer(&t_sleep);
+    TI_NewTimer(&t2);
 }
 
 // --- Descompon un numero 0..99 en desenes/unitats (sense divisions) ---
@@ -143,7 +148,7 @@ static char afegirNouAnimal(char esp) {
 
     animals_arr[q_animals].tipus = esp + 1;
     animals_arr[q_animals].despert = 1;
-    animals_arr[q_animals].count_son = 0;   // comenÃ§a a comptar els seus 2 min
+    animals_arr[q_animals].count_son = 0;   // comença a comptar els seus 2 min
 
     animals[esp]++;
     animals_desperts[esp]++;
@@ -286,7 +291,34 @@ void motorController(void) {
             }
             if (SiCharAvail()) {
                 c = SiGetChar();
-                state = 1;
+                if (c == CMD_INITIALIZE) {
+                    i = 0; j = 0;
+                    state = 2;
+                }
+                if (c == CMD_RESET) {
+                    ferReset();
+                }
+                if (c == CMD_START_REBELLION) {
+                    flag_rebellio = 1;
+                    HB_stop();          // apaga el heartbeat durant la rebel.lio
+                }
+                if (c == CMD_STOP_REBELLION) {
+                    flag_rebellio = 0;
+                    HB_start();         // restableix el heartbeat
+                }
+                if (c == CMD_GET_PRODUCTS) {
+                    state = 30;     // envia DATA_PRODUCTS
+                }
+                if (c == CMD_GET_ANIMALS) {
+                    k = 0;
+                    state = 40;     // envia llista d'animals + FINISH
+                }
+                if (c == CMD_CONSUME) {
+                    state = 50;     // llegeix l'opcio
+                }
+                if (c == CMD_SLEEP) {
+                    state = 60;     // llegeix TIPUS$NUM
+                }
                 break;
             }
             if (flag_comptatge == 1 && TI_GetTics(t) >= SEGON) {
@@ -296,103 +328,94 @@ void motorController(void) {
                 break;
             }
             // Comprova moviments del joystick i el polsador, i els envia a Java
-            if (statusFiMissatge()) {
-                if (CJ_hiHaUp()) {
-                    enviaMissatge(RSP_MOVE_UP_STR);
-                } else if (CJ_hiHaDown()) {
-                    enviaMissatge(RSP_MOVE_DOWN_STR);
-                } else if (CJ_hiHaLeft()) {
-                    enviaMissatge(RSP_MOVE_LEFT_STR);
-                } else if (CJ_hiHaRight()) {
-                    enviaMissatge(RSP_MOVE_RIGHT_STR);
-                } else if (CJ_hiHaSelect()) {
-                    enviaMissatge(RSP_SELECT_STR);
-                }
+//            if (CJ_hiHaUp()) {
+//                enviaMissatge(RSP_MOVE_UP_STR);
+//            } 
+//            if (CJ_hiHaDown()) {
+//                enviaMissatge(RSP_MOVE_DOWN_STR);
+//            } 
+//            if (CJ_hiHaLeft()) {
+//                enviaMissatge(RSP_MOVE_LEFT_STR);
+//            } 
+//            if (CJ_hiHaRight()) {
+//                enviaMissatge(RSP_MOVE_RIGHT_STR);
+//            } 
+            if(PORTBbits.RB2 == 0 && !flag_puls) {
+                TI_ResetTics(t2);
+                state = 5;
+            }
+            if (PORTBbits.RB2 == 1 && flag_puls) {
+                flag_puls = 0;
             }
             break;
 
         // Identifica comandament entrant
         case 1:
-            if (c == CMD_INITIALIZE) {
-                i = 0; j = 0;
-                state = 2;
-            } else if (c == CMD_RESET) {
-                ferReset();
-                state = 0;
-            } else if (c == CMD_START_REBELLION) {
-                flag_rebellio = 1;
-                HB_stop();          // apaga el heartbeat durant la rebel.lio
-                state = 0;
-            } else if (c == CMD_STOP_REBELLION) {
-                flag_rebellio = 0;
-                HB_start();         // restableix el heartbeat
-                state = 0;
-            } else if (c == CMD_GET_PRODUCTS) {
-                state = 30;     // envia DATA_PRODUCTS
-            } else if (c == CMD_GET_ANIMALS) {
-                k = 0;
-                state = 40;     // envia llista d'animals + FINISH
-            } else if (c == CMD_CONSUME) {
-                state = 50;     // llegeix l'opcio
-            } else if (c == CMD_SLEEP) {
-                state = 60;     // llegeix TIPUS$NUM
-            } else {
-                state = 0;      // comanda desconeguda, ignora
+            if(SiAvail()) {
+                if(str[i] != '\0') {
+                    SiSendChar(str[i]);
+                    i++;
+                } else{
+                    state = 0;
+                }
             }
+           
             break;
 
         // Llegeix nom granja fins '$'
         case 2:
             if (SiCharAvail()) { 
                 c = SiGetChar(); 
-                state = 3; 
-            }
-            break;
-        
-        case 3:
-            if (c != '$') {
-                if (i < MAX_NOM) { 
+                if (c != '$') {
                     linia1[i] = c;
                     i++; 
+                } else {
+                    i = 0;
+                    state = 4;
                 }
-                state = 2;
-            } else {
-                linia1[i] = '\0';
-                i = 0;
-                state = 4;
             }
             break;
         // Llegeix 4 temps de generacio
         case 4:
-            if (j < NUM_ESPECIES) { 
-                state = 5; 
+            
+            if (SiCharAvail()) { 
+                c = SiGetChar(); 
+                if(c != '\r') {
+                    if (c != '$' && c != '\n') {
+                        buffer[i] = c; 
+                        i++; 
+                    } else{
+                        ferItoaTemps();
+                        guardaTempsAnimal();
+                        j++; 
+                        i = 0;
+                        if (j >=NUM_ESPECIES) { 
+                            flag_init = 1; 
+                            state = 0; 
+                        }
+                    } 
+                }
+                
             }
-            else { 
-                flag_init = 1; 
-                state = 0; 
-            }
+            
+
             break;
 
         case 5:
-            if (SiCharAvail()) { 
-                c = SiGetChar(); 
-                state = 6; 
+            if(TI_GetTics(t2) > 100) {
+                if(PORTBbits.RB2 == 0) {
+                    flag_puls = 1;
+                    str = RSP_SELECT_STR;
+                    i = 0;
+                    state = 1;
+                }else {
+                    state = 0;
+                }
             }
             break;
 
         case 6:
-            if (c == '\r') {
-                state = 5;
-            } else if (c != '$' && c != '\n') {
-                if (i < MAX_BUFFER - 1) { buffer[i] = c; i++; }
-                state = 5;
-            } else {
-                buffer[i] = '\0';
-                ferItoaTemps();
-                guardaTempsAnimal();
-                j++; i = 0;
-                state = 4;
-            }
+            
             break;
 
         // Construeix linia 2 amb la data (font unica: TAD Hora) i dispara prints

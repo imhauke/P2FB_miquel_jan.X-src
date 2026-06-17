@@ -43,7 +43,7 @@ void motorHeartbeat(void) {
             state = 1;
             break;
 
-        // MantÃ© el LED encÃ¨s durant 'duty' tics
+        // Manté el LED encès durant 'duty' tics
         case 1:
             if (TI_GetTics(t) >= duty) {
                 LED_HB = 0;

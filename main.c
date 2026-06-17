@@ -1,6 +1,5 @@
 // cambiar codigo usando numero diferente de variables, definidas de forma diferente, nombres diferentes, usar consatntes con defin,
-//  y cambiar logica de flags e ifs, aÃ±adidendo mas o menos, y o juntando cosas en un mismo tad
-
+//  y cambiar logica de flags e ifs, añadidendo mas o menos, y o juntando cosas en un mismo tad
 #include <xc.h>
 #include "tad_eeprom.h"
 #include "tad_validador.h"
@@ -30,6 +29,15 @@ void __interrupt() RSI_HIGH(void) {
 
 void main(void) {
     TI_Init();
+
+    LcInit(2,16);
+    LcClear();
+    LcCursorOn();
+    LcGotoXY(0,0);
+
+    initManagerLcd();
+    //LCD_print(missatge);
+    
     initSioAux();
     initValidador();
     initHora();
@@ -44,6 +52,7 @@ void main(void) {
     while (1) {
         motorSioAux();
         motorValidador();
+        motorManagerLcd();
         motorHora();
         MNG_SIO_motor();
         motorController();

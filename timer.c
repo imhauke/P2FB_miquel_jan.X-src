@@ -9,8 +9,8 @@
 #include "timer.h"
 
 // Definicions, per interrupci? cada 2ms.
-#define T0CON_CONFIG 0x90			//1001 0000 - ON, 16b, PSA = 2
-#define RECARREGA_TMR0 63036        //0.5 ms, suposant FOsc a 40MHz.
+#define T0CON_CONFIG 0x9F			//1001 0000 - ON, 16b, PSA = 2
+#define RECARREGA_TMR0 63536        //0.2 ms, suposant FOsc a 40MHz.
 
 #define TI_NUMTIMERS 8              // Nombre de timers virtuals gestionats per aquest TAD. Si cal, s'incrementa o es disminueix...
 

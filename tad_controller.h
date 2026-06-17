@@ -40,6 +40,8 @@
 #define RSP_MOVE_RIGHT       'G'   // 'R' ja es RESET
 #define RSP_SELECT           'X'
 
+#define RSP_SELECT_STR      "X\r\n\0"
+
 // Estats animal per al protocol (text)
 #define TXT_SLEEP   "SLEEP"
 #define TXT_AWAKE   "AWAKE"

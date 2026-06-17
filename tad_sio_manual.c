@@ -99,13 +99,10 @@ void motorSioAux(void) {
             break;
 
         case 5:
-            if(TI_GetTics(t) >= 12) {
-
+            if (TI_GetTics(t) >= 12) {
                 TI_ResetTics(t);
-
                 state = 6;
             }
-
             break;
         
         case 6:
@@ -134,7 +131,7 @@ void motorSioAux(void) {
                 TI_ResetTics(t);
 
                 byteRx = (byteRx & 0x7F) | ((PIN_RX << 7) & 0x80);
-
+   
                 TI_ResetTics(t);
 
                 state = 8;

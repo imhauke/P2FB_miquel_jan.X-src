@@ -14,7 +14,7 @@
 #define RSP_MOVE_DOWN_STR   "D\r\n\0"
 #define RSP_MOVE_LEFT_STR   "L\r\n\0"
 #define RSP_MOVE_RIGHT_STR  "G\r\n\0"
-#define RSP_SELECT_STR      "X\r\n\0"
+
 
 void MNG_SIO_init(void);
 void MNG_SIO_motor(void);

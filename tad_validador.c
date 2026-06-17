@@ -38,28 +38,57 @@ void motorValidador(void) {
 
     switch (state) {
 
-        // Espera el primer caracter d'una trama
+        // Espera un caracter; quan arriba, el guarda i passa a fer-ne eco
         case 0:
             if (SIO_AUX_byteAvailable()) {
                 c = SIO_AUX_byteGet();
+                idx = 0;
+                state = 4;          // eco del caracter abans de processar-lo
+            }
+            break;
+
+        // Acumula la resta de la trama (amb eco de cada caracter)
+        case 1:
+            if (SIO_AUX_byteAvailable()) {
+                c = SIO_AUX_byteGet();
+                state = 5;          // eco i despres acumula
+            }
+            break;
+
+        // --- Eco del primer caracter ---
+        case 4:
+            if (SIO_AUX_txAvailable()) {
+                SIO_AUX_sendByte(c);
                 if (c != '\r' && c != '\n') {
                     buffer[0] = c;
                     idx = 1;
                     state = 1;
+                } else {
+                    state = 0;      // linia buida, ignora
                 }
             }
             break;
 
-        // Acumula fins '\n'
-        case 1:
-            if (SIO_AUX_byteAvailable()) {
-                c = SIO_AUX_byteGet();
-                if (c == '\n') {
-                    state = 2;
-                } else if (c != '\r') {
+        // --- Eco d'un caracter de la trama, despres l'acumula ---
+        // L'Enter (\r o \n) marca el final de la trama -> a validar.
+        case 5:
+            if (SIO_AUX_txAvailable()) {
+                SIO_AUX_sendByte(c);
+                if (c == '\r' || c == '\n') {
+                    state = 6;      // fi de trama: salt de linia i valida
+                } else {
                     if (idx < VAL_BUFFER) { buffer[idx] = c; }
                     idx++;
+                    state = 1;      // seguent caracter
                 }
+            }
+            break;
+
+        // Salt de linia perque la resposta surti a la linia seguent
+        case 6:
+            if (SIO_AUX_txAvailable()) {
+                SIO_AUX_sendByte('\n');
+                state = 2;
             }
             break;
 

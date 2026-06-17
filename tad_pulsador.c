@@ -5,8 +5,9 @@ static unsigned char t;
 
 void initPulsador(void) {
     TRIS_SW = 1;        // entrada
-    flag_select = 0;
-    TI_NewTimer(&t);
+    INTCON2bits.NOT_RBPU = 0;
+//    flag_select = 0;
+//    TI_NewTimer(&t);
 }
 
 char PULSADOR_hiHaSelect(void) {
