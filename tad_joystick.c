@@ -46,10 +46,10 @@ void motorJoystick(void) {
             if (result_x < 100 || result_x > 160) {
                 if (flag_mig_x == 1) {
                     if (result_x > 160) {
-                        posX = 1; //right
+                        posX = 2; //left
                         flag_x = 1;
                     } else {
-                        posX = 2; //left
+                        posX = 1; //right
                         flag_x = 1;
                     }
 
