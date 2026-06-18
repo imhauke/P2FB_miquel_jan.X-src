@@ -1,5 +1,5 @@
-// cambiar codigo usando numero diferente de variables, definidas de forma diferente, nombres diferentes, usar consatntes con defin,
-//  y cambiar logica de flags e ifs, añadidendo mas o menos, y o juntando cosas en un mismo tad
+#include <xc.h>
+
 #include <xc.h>
 #include "tad_eeprom.h"
 #include "tad_validador.h"
@@ -21,46 +21,38 @@
 #pragma config BOR = OFF
 #pragma config LVP = OFF
 
+static char missatge[] = "Jan chupamingas";
+
 void __interrupt() RSI_HIGH(void) {
-    if (INTCONbits.TMR0IF == 1) {
+    if (INTCONbits.TMR0IF) {
         RSI_Timer0();
     }
 }
 
 void main(void) {
+    ADCON1 = 0x0F;
+    SiInit();
     TI_Init();
-
+    initSioAux();
+    initControlador();
+    
     LcInit(2,16);
     LcClear();
     LcCursorOn();
     LcGotoXY(0,0);
 
     initManagerLcd();
-    //LCD_print(missatge);
-    
-    initSioAux();
-    initValidador();
-    initHora();
-    MNG_SIO_init();
+    LCD_print(missatge);
     initController();
-    initControllerAdc();
-    initJoystick();
     initPulsador();
-    initLDR();
-    initEeprom();
-    initHeartbeat();
+
+    ei();
+
     while (1) {
-        motorSioAux();
-        motorValidador();
-        motorManagerLcd();
-        motorHora();
-        MNG_SIO_motor();
+//        motorSioAux();
+//        motorControlador();
+//        motorManagerLcd();
         motorController();
-        motorControllerAdc();
-        motorJoystick();
-        motorPulsador();
-        motorLDR();
-        motorEeprom();
-        motorHeartbeat();
+        //motorPulsador();
     }
 }
