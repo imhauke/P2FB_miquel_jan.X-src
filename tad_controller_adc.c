@@ -47,7 +47,7 @@ void motorControllerAdc(void) {
                 }
             }
             LDR_start();
-            state = 3;
+            state = 0; /////////////////////////////////////////////////////////////////////////
             break;
         
         case 3:
