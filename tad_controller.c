@@ -148,7 +148,7 @@ static char afegirNouAnimal(char esp) {
 
     animals_arr[q_animals].tipus = esp + 1;
     animals_arr[q_animals].despert = 1;
-    animals_arr[q_animals].count_son = 0;   // comença a comptar els seus 2 min
+    animals_arr[q_animals].count_son = 0;   // comenï¿½a a comptar els seus 2 min
 
     animals[esp]++;
     animals_desperts[esp]++;
@@ -327,19 +327,33 @@ void motorController(void) {
                 state = 9;
                 break;
             }
-            // Comprova moviments del joystick i el polsador, i els envia a Java
-//            if (CJ_hiHaUp()) {
-//                enviaMissatge(RSP_MOVE_UP_STR);
-//            } 
-//            if (CJ_hiHaDown()) {
-//                enviaMissatge(RSP_MOVE_DOWN_STR);
-//            } 
-//            if (CJ_hiHaLeft()) {
-//                enviaMissatge(RSP_MOVE_LEFT_STR);
-//            } 
-//            if (CJ_hiHaRight()) {
-//                enviaMissatge(RSP_MOVE_RIGHT_STR);
-//            } 
+            // Moviments del joystick: mateix patro que el polsador.
+            // Preparem str amb la frase corresponent i enviem (state = 1).
+            if (CJ_hiHaUp()) {
+                str = RSP_MOVE_UP_STR;
+                i = 0;
+                state = 1;
+                break;
+            }
+            if (CJ_hiHaDown()) {
+                str = RSP_MOVE_DOWN_STR;
+                i = 0;
+                state = 1;
+                break;
+            }
+            if (CJ_hiHaLeft()) {
+                str = RSP_MOVE_LEFT_STR;
+                i = 0;
+                state = 1;
+                break;
+            }
+            if (CJ_hiHaRight()) {
+                str = RSP_MOVE_RIGHT_STR;
+                i = 0;
+                state = 1;
+                break;
+            }
+            // Polsador SELECT (antirebot per RB2)
             if(PORTBbits.RB2 == 0 && !flag_puls) {
                 TI_ResetTics(t2);
                 state = 5;
