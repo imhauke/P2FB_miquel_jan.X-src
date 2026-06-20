@@ -5,14 +5,14 @@
 #include "timer.h"
 
 // LED Heartbeat per software PWM (no cal CCP). Pin RB0.
-#define TRIS_HB     TRISBbits.TRISB0
-#define LED_HB      LATBbits.LATB0
+#define TRIS_HB     TRISAbits.TRISA3
+#define LED_HB      LATAbits.LATA3
 
 // --- Software PWM ---
-// Periode PWM = 40 tics (0.5ms/tic -> 20ms -> 50 periodes per segon)
-#define HB_PERIODE      40
+// Periode PWM = 40 tics (0.2ms/tic -> 8ms
+#define HB_PERIODE      100
 // Duty: 0..40 (0% .. 100%)
-#define HB_DUTY_MAX     40
+#define HB_DUTY_MAX     100
 
 // Rampa: pugem duty de 0 a 40 i el baixem de 40 a 0.
 // 40 passos pujant + 40 baixant = 80 periodes.

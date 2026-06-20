@@ -5,7 +5,8 @@
 
 // --- Variables privades ---
 static char linia1[16] = {"                "};   // nom granja  (16 chars + espais)
-static char linia2[17];   // " DD/MM/2026" o el que vulguis + '\0'
+static char linia2[16] = {" 00/00/2026     "};   // " DD/MM/2026" o el que vulguis
+static char flag_amunt;
 static char buffer[MAX_BUFFER];
 static char c;
 static char i, j, k;
@@ -43,6 +44,7 @@ static char *str;
 static unsigned char t;
 static unsigned char t2;
 static char flag_puls;
+
 
 // --- Init ---
 void initController(void) {
@@ -147,15 +149,15 @@ static char afegirNouAnimal(char esp) {
     }
 
     animals_arr[q_animals].tipus = esp + 1;
-    animals_arr[q_animals].despert = 1;
-    animals_arr[q_animals].count_son = 0;   // comen�a a comptar els seus 2 min
+    animals_arr[q_animals].despert = 1; //TODO els flags despert que es gestionin amb un array fora de l'estructura
+    animals_arr[q_animals].count_son = 0;   // comen?a a comptar els seus 2 min
 
     animals[esp]++;
     animals_desperts[esp]++;
     q_animals++;
 
     // Notifica al LCD: "Nou Animal <Tipus>: <num>"
-    LCD_notifica(NOTIF_ANIMAL, esp, animals[esp]);
+    LCD_notifica(NOTIF_ANIMAL, esp, animals[esp]); //TODO fer desde el propi controller
 
     return 1;
 }
@@ -277,15 +279,18 @@ void motorController(void) {
         // Espera inicialitzacio completa (Java + hora serial)
         case 0:
             // A l'arrencada, restaura primer els animals guardats a l'EEPROM
-            if (flag_restaura == 1) {
-                k = 0;
-                ee_addr = EE_ADDR_ANIMALS;
-                state = 80;
-                break;
-            }
+//            if (flag_restaura == 1) {
+//                k = 0;
+//                ee_addr = EE_ADDR_ANIMALS;
+//                state = 80;
+//                break;
+//            }
+            //TODO: el V_isFlagOk ara sera al reves perque la hora la tindra el controller
             if (flag_init == 1 && V_isFlagOk() && flag_comptatge == 0) {
                 TI_ResetTics(t);
                 i = 0;
+                LcGotoXY(0,0);
+                flag_amunt = 1;
                 state = 7;
                 break;
             }
@@ -322,7 +327,7 @@ void motorController(void) {
                 break;
             }
             if (flag_comptatge == 1 && TI_GetTics(t) >= SEGON) {
-                TI_ResetTics(t);
+                TI_ResetTics(t); //TODO no sabem si es necessari, depen
                 i = 0;
                 state = 9;
                 break;
@@ -435,30 +440,37 @@ void motorController(void) {
         // Construeix linia 2 amb la data (font unica: TAD Hora) i dispara prints
         case 7:
             // Linia 2: " DD/MM/2026" (11 chars). Llegim del TAD Hora.
-            linia2[0]  = ' ';
-            linia2[1]  = '0' + desenes(HORA_getDia());
-            linia2[2]  = '0' + unitats(HORA_getDia());
-            linia2[3]  = '/';
-            linia2[4]  = '0' + desenes(HORA_getMes());
-            linia2[5]  = '0' + unitats(HORA_getMes());
-            linia2[6]  = '/';
-            linia2[7]  = '2';
-            linia2[8]  = '0';
-            linia2[9]  = '2';
-            linia2[10] = '6';
-            linia2[11] = '\0';
+            
+            //TODO: el tad validador posara les dades ascii de la hora
+            //directament dins de la linia2 per tant aixo tambe s'eliminara
+            //perque la linia 2 sempre estara actualitzada gracies al validador
+//            linia2[1]  = des_dia_ascii;
+//            linia2[2]  = u_dia_ascii;
+//            linia2[4]  = des_mes_ascii;
+//            linia2[5]  = u_mes_ascii;
 
-            LCD_print(linia1);
-            LCD_print2(linia2);
-            state = 8;
-            break;
-        // Espera que el manager hagi acabat de pintar les dues linies
-        case 8:
-            if (LCD_flag1() == 0 && LCD_flag2() == 0) {
-                flag_comptatge = 1;
-                state = 0;
+            if(flag_amunt) {
+                if(i < 16) {
+                    LcPutChar(linia1[i]);
+                    i++;
+                }else if(i == 16){
+                    LcGotoXY(0,1);
+                    flag_amunt = 0;
+                    i = 0;
+                }
+            }else{
+                if(i < 16) {
+                    LcPutChar(linia2[i]);
+                    i++;
+                }else{
+                    //ja ha acabat de dibuixar la pantalla
+                    TI_ResetTics(t);
+                    flag_comptatge =1;
+                    state = 0;
+                }
             }
             break;
+            
         // --- Cada segon: generacio animals, especie i ---
         case 9:
             if (i < NUM_ESPECIES) {

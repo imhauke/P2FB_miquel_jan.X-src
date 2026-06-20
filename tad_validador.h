@@ -12,8 +12,8 @@
 #define VAL_BUFFER   14   // "DD/MM HH:MM:SS" = 14 chars
 
 // Missatges de feedback pel terminal
-#define MSG_OK    "Date and time correct\r\n"
-#define MSG_ERR   "Please input a correct date\r\n"
+#define MSG_OK    "Date and time correct\r\n\0"
+#define MSG_ERR   "Please input a correct date\r\n\0"
 
 void initValidador(void);
 void motorValidador(void);

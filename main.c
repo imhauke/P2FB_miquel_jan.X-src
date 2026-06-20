@@ -13,6 +13,7 @@
 #include "tad_controlador.h"
 #include "tad_joystick.h"
 #include "tad_ldr.h"
+#include "motor_first_steps.h"
 
 #pragma config OSC = HSPLL
 #pragma config PBADEN = DIG
@@ -38,19 +39,22 @@ void main(void) {
     LcCursorOn();
     LcGotoXY(0,0);
 
-//    initManagerLcd();
+    //initManagerLcd();
     initController();
     initControllerAdc();
     initJoystick();
-    initPulsador();
     initSioAux();
-
+    initValidador();
+    initHora();
+    initHeartbeat();
+    
     while (1) {
-//        motorManagerLcd();
-        motorController();
-        motorJoystick();
-        motorControllerAdc();
+//        motorController();
+//        motorJoystick();
+//        motorControllerAdc();
+//        motorHeartbeat();
         motorSioAux();
-        //motorPulsador();
+        motorValidador();
+//        motorHora();
     }
 }

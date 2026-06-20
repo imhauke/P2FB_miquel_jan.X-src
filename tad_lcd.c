@@ -80,21 +80,21 @@ void LcInit(char rows, char columns) {
 		// This sequence is set by the manual.
 
 		EscriuPrimeraOrdre(CURSOR_ON | DISPLAY_CLEAR);
-		Espera(Timer, 5);
+		Espera(Timer, 30);
 		EscriuPrimeraOrdre(CURSOR_ON | DISPLAY_CLEAR);
-		Espera(Timer, 1);
+		Espera(Timer, 10);
 		EscriuPrimeraOrdre(CURSOR_ON | DISPLAY_CLEAR);
-		Espera(Timer, 1);
+		Espera(Timer, 10);
 		// .. three times. 
 		// Now one at 4 bits
 		EscriuPrimeraOrdre(CURSOR_ON);
-		Espera(Timer, 1);
+		Espera(Timer, 10);
 		CantaIR(FUNCTION_SET | DISPLAY_CONTROL); 	// 4bits, 1 row, font 5x7
 		// The first line is erased here 
 		// Now we can wait for busy
 		WaitForBusy(); 	CantaIR(DISPLAY_CONTROL);  	// Display Off
 		WaitForBusy(); 	CantaIR(DISPLAY_CLEAR);	   	// All spaces
-		Espera(Timer,3); // 1.64ms V1.1
+		Espera(Timer,10); // 1.64ms V1.1
 		WaitForBusy(); 	CantaIR(DISPLAY_ON | CURSOR_ON); // Auto Increment and shift
 		WaitForBusy(); 	CantaIR(DISPLAY_CONTROL | DISPLAY_ON | CURSOR_ON | DISPLAY_CLEAR); 		// Display On
 	}
@@ -108,7 +108,7 @@ void LcClear(void) {
 // Post: Erases the display and sets the cursor to its previous state. 
 // Post: The next order can last up to 1.6ms. 
 	WaitForBusy(); 	CantaIR(DISPLAY_CLEAR);	   //Spaces
-	Espera(Timer, 2); // V1.1
+	Espera(Timer, 10); // V1.1
 }
 
 void LcCursorOn(void) {
@@ -131,25 +131,26 @@ void LcGotoXY(char Column, char Row) {
 // Post: The next order can last until 40us.
 	char Fisics;
 	// calculating the effective address of the LCD ram. 
-	switch (Rows) {
-		case 2:
-			Fisics = Column + (!Row ? 0 : 0x40); break;
-		case 4:
-			Fisics = Column;
-			if (Row == 1) Fisics += 0x40; else
-			if (Row == 2) Fisics += Columns;      /* 0x14; */ else
-			if (Row == 3) Fisics += 0x40+Columns; /* 0x54; */
-			break;
-		case 1:
-		default:
-			Fisics = Column; break;
-	}
+    Fisics = Column + (!Row ? 0 : 0x40);
+//	switch (Rows) {
+//		case 2:
+//			Fisics = Column + (!Row ? 0 : 0x40); break;
+//		case 4:
+//			Fisics = Column;
+//			if (Row == 1) Fisics += 0x40; else
+//			if (Row == 2) Fisics += Columns;      /* 0x14; */ else
+//			if (Row == 3) Fisics += 0x40+Columns; /* 0x54; */
+//			break;
+//		case 1:
+//		default:
+//			Fisics = Column; break;
+//	}
 	// applying the command
 	WaitForBusy();
 	CantaIR(SET_DDRAM | Fisics);
 	// Finally, I refresh the local images.
 	RowAct    = Row;
-	ColumnAct = Column;
+//	ColumnAct = Column;
 }
 
 void LcPutChar(char c) {
@@ -164,25 +165,25 @@ void LcPutChar(char c) {
 	// The char is written
 	WaitForBusy(); CantaData(c);
 	// The cursor position is recalculated.
-	++ColumnAct;
-	if (Rows == 3) {
-		if (ColumnAct >= 20) {
-			ColumnAct = 0;
-			if (++RowAct >= 4) RowAct = 0;
-			LcGotoXY(ColumnAct, RowAct);
-		}
-	} else
-	if (Rows == 2) {
-		if (ColumnAct >= 40) {
-			ColumnAct = 0;
-			if (++RowAct >= 2) RowAct = 0;
-			LcGotoXY(ColumnAct, RowAct);
-		}
-	} else
-	if (RowAct == 1) {
-		if (ColumnAct >= 40) ColumnAct = 0;
-		LcGotoXY(ColumnAct, RowAct);
-	}
+//	++ColumnAct;
+//	if (Rows == 3) {
+//		if (ColumnAct >= 20) {
+//			ColumnAct = 0;
+//			if (++RowAct >= 4) RowAct = 0;
+//			LcGotoXY(ColumnAct, RowAct);
+//		}
+//	} else
+//	if (Rows == 2) {
+//		if (ColumnAct >= 40) {
+//			ColumnAct = 0;
+//			if (++RowAct >= 2) RowAct = 0;
+//			LcGotoXY(ColumnAct, RowAct);
+//		}
+//	} else
+//	if (RowAct == 1) {
+//		if (ColumnAct >= 40) ColumnAct = 0;
+//		LcGotoXY(ColumnAct, RowAct);
+//	}
 }
 
 
@@ -203,7 +204,7 @@ void LcPutString(char *s) {
 
 void Espera(unsigned char Timer, int ms) {
     TI_ResetTics(Timer);
-    while(TI_GetTics(Timer) < (ms * TICS_PER_MS));
+    while(TI_GetTics(Timer) < TICS_PER_MS);
 }
 
 void CantaPartAlta(char c) {
