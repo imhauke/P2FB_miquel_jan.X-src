@@ -3,13 +3,9 @@
 
 #include <xc.h>
 #include "tad_sio.h"
-#include "tad_manager_lcd.h"
 #include "tad_lcd.h"
 #include "timer.h"
 #include "tad_controller_adc.h"
-#include "tad_sio_manual.h"
-#include "tad_validador.h"
-#include "tad_hora.h"
 #include "tad_eeprom.h"
 #include "tad_manager_sio.h"
 #include "tad_heartbeat.h"
@@ -65,21 +61,26 @@
 // Son critic individual: 2 min des de la generacio de cada animal (en segons)
 #define TEMPS_SON           120
 
-// 1 segon en tics (1 tic = 0.5ms @ 40MHz -> 2000 tics = 1s)
-#define SEGON               2000
+// 1 segon en tics (1 tic = 0.2ms @ 40MHz -> 5000 tics = 1s)
+#define SEGON               5000
 // 5 segons (espera per tapar l'LDR)
-#define TICKS_5S            10000
+#define TICKS_5S            25000
 
 typedef struct {
     char tipus;     // 1=vaca 2=cavall 3=porc 4=gallina (0=slot buit)
-    char despert;   // 1=despert, 0=son critic
     char count_son; // segons des de la seva generacio (cap a son critic)
 } Animal;
+// Nota: l'estat despert/dormit es gestiona en un array separat (desperts_flag[])
+// dins de tad_controller.c, no dins de l'estructura.
 
 void initController(void);
 void motorController(void);
 void guardaCaracterTemps(void);
 void ferItoaTemps(void);
 void guardaTempsAnimal(void);
+
+// Rellotge del sistema (abans tad_hora). El validador crida HORA_set
+// quan rep una data/hora valida. El controller controla el temps.
+void HORA_set(char d, char mo, char h, char mi, char s);
 
 #endif

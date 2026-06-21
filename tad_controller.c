@@ -3,6 +3,31 @@
 #define MAX_NOM    16
 #define MAX_BUFFER  2
 
+// --- Notificacions LCD (cua propia del controller) ---
+#define NOTIF_ANIMAL    0
+#define NOTIF_PRODUCTE  1
+#define NOTIF_MAX       4         // cua de minim 3 (enunciat)
+#define TICKS_NOTIF     15000     // 3s visibles (0.2ms/tic -> 15000 tics)
+
+#define TXT_NOU_ANIMAL    "Nou Animal "
+#define TXT_NOU_PRODUCTE  "Nou Producte "
+
+static const char NOM_ANIMAL[NUM_ESPECIES][8] = {
+    "Vaca", "Cavall", "Porc", "Gallina"
+};
+static const char NOM_PRODUCTE[NUM_ESPECIES][9] = {
+    "Llet", "Pinzell", "Pernil", "Ous"
+};
+
+static char notif_kind[NOTIF_MAX];
+static char notif_tipus[NOTIF_MAX];
+static char notif_num[NOTIF_MAX];
+static char notif_cap, notif_cua, notif_n;
+static char notif_text[17];       // text de la notificacio en curs
+static unsigned char t_notif;     // timer dels 3s
+static char fmt_state, fmt_p, fmt_m;  // sub-estats del formatat (sense bucles)
+static const char *fmt_src;
+
 // --- Variables privades ---
 static char linia1[16] = {"                "};   // nom granja  (16 chars + espais)
 static char linia2[16] = {" 00/00/2026     "};   // " DD/MM/2026" o el que vulguis
@@ -21,6 +46,7 @@ static const char temps_producte[NUM_ESPECIES] = {
 };
 
 static Animal animals_arr[MAX_ANIMALS_TOTAL];
+static char desperts_flag[MAX_ANIMALS_TOTAL]; // 1=despert 0=son, paral.lel a animals_arr
 static char animals[NUM_ESPECIES];
 static char animals_desperts[NUM_ESPECIES];
 static char q_animals;
@@ -45,6 +71,14 @@ static unsigned char t;
 static unsigned char t2;
 static char flag_puls;
 
+// --- Rellotge del sistema (abans tad_hora) ---
+static char dia, mes, hora, minut, segon;
+static char flag_hora;          // 1 = ja s'ha rebut una data/hora valida
+static unsigned char t_rellotge; // timer per avancar els segons
+static const char DIES_MES[13] = {
+    0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31
+};
+
 
 // --- Init ---
 void initController(void) {
@@ -52,8 +86,11 @@ void initController(void) {
     flag_comptatge = 0;
     flag_rebellio = 0;
     flag_restaura = 1;     // a l'arrencada, restaura animals des de l'EEPROM
+    flag_hora = 0;         // encara no s'ha rebut la data/hora
+    dia = 1; mes = 1; hora = 0; minut = 0; segon = 0;
     i = 0; j = 0; k = 0;
     q_animals = 0;
+    notif_cap = 0; notif_cua = 0; notif_n = 0;
 
     animals[0] = 0; animals[1] = 0;
     animals[2] = 0; animals[3] = 0;
@@ -72,6 +109,51 @@ void initController(void) {
     TI_NewTimer(&t);
     TI_NewTimer(&t_sleep);
     TI_NewTimer(&t2);
+    TI_NewTimer(&t_rellotge);
+    TI_NewTimer(&t_notif);
+}
+
+// --- Encua una notificacio (kind=NOTIF_ANIMAL/PRODUCTE, tipus 0..3, num) ---
+static void notifica(char kind, char tipus, char num) {
+    if (notif_n >= NOTIF_MAX) return;   // cua plena, descartem
+    notif_kind[notif_cap]  = kind;
+    notif_tipus[notif_cap] = tipus;
+    notif_num[notif_cap]   = num;
+    notif_cap++;
+    if (notif_cap >= NOTIF_MAX) notif_cap = 0;
+    notif_n++;
+}
+
+// --- Rellotge del sistema (abans tad_hora) ---
+// El validador crida aquesta funcio quan rep una data/hora valida.
+void HORA_set(char d, char mo, char h, char mi, char s) {
+    dia = d; mes = mo; hora = h; minut = mi; segon = s;
+    flag_hora = 1;
+    TI_ResetTics(t_rellotge);
+}
+
+// Avanca el rellotge un segon (cridat des del motor cada SEGON tics)
+static void avancaRellotge(void) {
+    segon++;
+    if (segon >= 60) {
+        segon = 0;
+        minut++;
+        if (minut >= 60) {
+            minut = 0;
+            hora++;
+            if (hora >= 24) {
+                hora = 0;
+                dia++;
+                if (dia > DIES_MES[mes]) {
+                    dia = 1;
+                    mes++;
+                    if (mes > 12) {
+                        mes = 1;
+                    }
+                }
+            }
+        }
+    }
 }
 
 // --- Descompon un numero 0..99 en desenes/unitats (sense divisions) ---
@@ -117,6 +199,80 @@ static char posaNum(char p, char n) {
     return p;
 }
 
+// --- Centenes d'un numero 0..255 (sense divisions) ---
+static char centenes(char n) {
+    if (n >= 200) return 2;
+    if (n >= 100) return 1;
+    return 0;
+}
+// Treu les centenes per poder calcular desenes/unitats del que queda
+static char treuCentenes(char n) {
+    if (n >= 200) return n - 200;
+    if (n >= 100) return n - 100;
+    return n;
+}
+
+// --- Prepara el formatat de la notificacio del cap de cua ---
+static void iniciaFormatNotif(void) {
+    if (notif_kind[notif_cua] == NOTIF_ANIMAL) {
+        fmt_src = TXT_NOU_ANIMAL;
+    } else {
+        fmt_src = TXT_NOU_PRODUCTE;
+    }
+    fmt_state = 0;
+    fmt_p = 0;
+    fmt_m = 0;
+}
+
+// --- Avanca el formatat un caracter. Retorna 1 mentre treballa, 0 al acabar ---
+// Construeix "Nou Animal Vaca: 2" / "Nou Producte Ous: 11" a notif_text.
+static char passaFormatNotif(void) {
+    char num, cent, des;
+
+    switch (fmt_state) {
+        case 0: // copia el prefix
+            if (fmt_src[fmt_m] != '\0') {
+                notif_text[fmt_p] = fmt_src[fmt_m];
+                fmt_p++; fmt_m++;
+            } else {
+                if (notif_kind[notif_cua] == NOTIF_ANIMAL)
+                    fmt_src = NOM_ANIMAL[notif_tipus[notif_cua]];
+                else
+                    fmt_src = NOM_PRODUCTE[notif_tipus[notif_cua]];
+                fmt_m = 0;
+                fmt_state = 1;
+            }
+            break;
+
+        case 1: // copia el nom de l'especie/producte
+            if (fmt_src[fmt_m] != '\0' && fmt_p < 13) {
+                notif_text[fmt_p] = fmt_src[fmt_m];
+                fmt_p++; fmt_m++;
+            } else {
+                notif_text[fmt_p] = ':';  fmt_p++;
+                notif_text[fmt_p] = ' ';  fmt_p++;
+                fmt_state = 2;
+            }
+            break;
+
+        case 2: // escriu el numero (fins 3 digits)
+            num  = notif_num[notif_cua];
+            cent = centenes(num);
+            num  = treuCentenes(num);
+            des  = desenes(num);
+            if (cent > 0) { notif_text[fmt_p] = '0' + cent; fmt_p++; }
+            if (cent > 0 || des > 0) { notif_text[fmt_p] = '0' + des; fmt_p++; }
+            notif_text[fmt_p] = '0' + unitats(num); fmt_p++;
+            notif_text[fmt_p] = '\0';
+            fmt_state = 3;
+            break;
+
+        default:
+            return 0;
+    }
+    return 1;
+}
+
 // --- Auxiliars parser INITIALIZE ---
 void guardaCaracterTemps(void) {
     if (c != '\r') {
@@ -149,15 +305,15 @@ static char afegirNouAnimal(char esp) {
     }
 
     animals_arr[q_animals].tipus = esp + 1;
-    animals_arr[q_animals].despert = 1; //TODO els flags despert que es gestionin amb un array fora de l'estructura
-    animals_arr[q_animals].count_son = 0;   // comen?a a comptar els seus 2 min
+    desperts_flag[q_animals] = 1;           // despert (array paral.lel)
+    animals_arr[q_animals].count_son = 0;   // comenca a comptar els seus 2 min
 
     animals[esp]++;
     animals_desperts[esp]++;
     q_animals++;
 
     // Notifica al LCD: "Nou Animal <Tipus>: <num>"
-    LCD_notifica(NOTIF_ANIMAL, esp, animals[esp]); //TODO fer desde el propi controller
+    notifica(NOTIF_ANIMAL, esp, animals[esp]);
 
     return 1;
 }
@@ -168,11 +324,11 @@ static char posarAnimalsASon(void) {
     if (k >= q_animals) {
         return 0;
     }
-    if (animals_arr[k].despert == 1) {
+    if (desperts_flag[k] == 1) {
         animals_arr[k].count_son++;
         if (animals_arr[k].count_son >= TEMPS_SON) {
             animals_arr[k].count_son = 0;
-            animals_arr[k].despert = 0;
+            desperts_flag[k] = 0;
             animals_desperts[animals_arr[k].tipus - 1]--;
         }
     }
@@ -184,7 +340,7 @@ static char posarAnimalsASon(void) {
 static void incrementarProductes(char esp) {
     productes[esp] += animals_desperts[esp];
     // Notifica al LCD: "Nou Producte <Tipus>: <total>"
-    LCD_notifica(NOTIF_PRODUCTE, esp, productes[esp]);
+    notifica(NOTIF_PRODUCTE, esp, productes[esp]);
 }
 
 // --- Construeix "P llet$pernil$ous$pinzells" a resp[] (resposta GET_PRODUCTS) ---
@@ -229,7 +385,7 @@ static void construeixAnimal(char num_especie) {
     resp[p++] = '$';
     p = posaNum(p, num_especie);
     resp[p++] = '$';
-    if (animals_arr[k].despert == 1) {
+    if (desperts_flag[k] == 1) {
         resp[p++]='A'; resp[p++]='W'; resp[p++]='A'; resp[p++]='K'; resp[p++]='E';
     } else {
         resp[p++]='S'; resp[p++]='L'; resp[p++]='E'; resp[p++]='E'; resp[p++]='P';
@@ -285,13 +441,19 @@ void motorController(void) {
 //                state = 80;
 //                break;
 //            }
-            //TODO: el V_isFlagOk ara sera al reves perque la hora la tindra el controller
-            if (flag_init == 1 && V_isFlagOk() && flag_comptatge == 0) {
+            // L'hora ja la controla el controller: flag_hora l'activa HORA_set
+            if (flag_init == 1 && flag_hora == 1 && flag_comptatge == 0) {
                 TI_ResetTics(t);
                 i = 0;
                 LcGotoXY(0,0);
                 flag_amunt = 1;
                 state = 7;
+                break;
+            }
+            // Notificacions pendents: les mostrem al LCD (>=3s cadascuna)
+            if (flag_comptatge == 1 && notif_n > 0) {
+                iniciaFormatNotif();
+                state = 90;
                 break;
             }
             if (SiCharAvail()) {
@@ -325,6 +487,11 @@ void motorController(void) {
                     state = 60;     // llegeix TIPUS$NUM
                 }
                 break;
+            }
+            // Avanca el rellotge cada segon (independent del comptatge d'animals)
+            if (flag_hora == 1 && TI_GetTics(t_rellotge) >= SEGON) {
+                TI_ResetTics(t_rellotge);
+                avancaRellotge();
             }
             if (flag_comptatge == 1 && TI_GetTics(t) >= SEGON) {
                 TI_ResetTics(t); //TODO no sabem si es necessari, depen
@@ -441,13 +608,11 @@ void motorController(void) {
         case 7:
             // Linia 2: " DD/MM/2026" (11 chars). Llegim del TAD Hora.
             
-            //TODO: el tad validador posara les dades ascii de la hora
-            //directament dins de la linia2 per tant aixo tambe s'eliminara
-            //perque la linia 2 sempre estara actualitzada gracies al validador
-//            linia2[1]  = des_dia_ascii;
-//            linia2[2]  = u_dia_ascii;
-//            linia2[4]  = des_mes_ascii;
-//            linia2[5]  = u_mes_ascii;
+            // La data la te el propi controller; omplim linia2 amb dia/mes ASCII
+            linia2[1]  = '0' + desenes(dia);
+            linia2[2]  = '0' + unitats(dia);
+            linia2[4]  = '0' + desenes(mes);
+            linia2[5]  = '0' + unitats(mes);
 
             if(flag_amunt) {
                 if(i < 16) {
@@ -654,8 +819,8 @@ void motorController(void) {
 
         // Marca l'animal dormit i comenca a guardar el timestamp a EEPROM
         case 67:
-            if (animals_arr[k].despert == 1) {
-                animals_arr[k].despert = 0;
+            if (desperts_flag[k] == 1) {
+                desperts_flag[k] = 0;
                 animals_desperts[sleep_esp]--;
             }
             animals_arr[k].count_son = 0;   // reinicia el seu cicle de son
@@ -671,15 +836,15 @@ void motorController(void) {
             } else if (ee_pas == 1) {
                 EE_writeByte(ee_addr + EE_OFF_TIPUS, animals_arr[k].tipus);
             } else if (ee_pas == 2) {
-                EE_writeByte(ee_addr + EE_OFF_DIA,  HORA_getDia());
+                EE_writeByte(ee_addr + EE_OFF_DIA,  dia);
             } else if (ee_pas == 3) {
-                EE_writeByte(ee_addr + EE_OFF_MES,  HORA_getMes());
+                EE_writeByte(ee_addr + EE_OFF_MES,  mes);
             } else if (ee_pas == 4) {
-                EE_writeByte(ee_addr + EE_OFF_HORA, HORA_getHora());
+                EE_writeByte(ee_addr + EE_OFF_HORA, hora);
             } else if (ee_pas == 5) {
-                EE_writeByte(ee_addr + EE_OFF_MIN,  HORA_getMinut());
+                EE_writeByte(ee_addr + EE_OFF_MIN,  minut);
             } else if (ee_pas == 6) {
-                EE_writeByte(ee_addr + EE_OFF_SEG,  HORA_getSegon());
+                EE_writeByte(ee_addr + EE_OFF_SEG,  segon);
             } else {
                 state = 69;     // tots escrits
                 break;
@@ -725,7 +890,7 @@ void motorController(void) {
             ee_tipus = EE_readByte(ee_addr + EE_OFF_TIPUS);
             if (ee_tipus >= 1 && ee_tipus <= NUM_ESPECIES) {
                 animals_arr[k].tipus   = ee_tipus;
-                animals_arr[k].despert = 1;     // arrenca despert
+                desperts_flag[k] = 1;           // arrenca despert
                 animals_arr[k].count_son = 0;
                 animals[ee_tipus - 1]++;
                 animals_desperts[ee_tipus - 1]++;
@@ -733,6 +898,74 @@ void motorController(void) {
             }
             k++;
             ee_addr += EE_BYTES_ANIMAL;
+            break;
+
+        // === NOTIFICACIONS LCD ===
+        // Construeix el text de la notificacio, un caracter per pas
+        case 90:
+            if (passaFormatNotif()) {
+                // segueix formatant
+            } else {
+                LcClear();
+                LcGotoXY(0, 0);
+                i = 0;
+                state = 91;
+            }
+            break;
+
+        // Pinta la notificacio caracter a caracter
+        case 91:
+            if (notif_text[i] != '\0') {
+                LcPutChar(notif_text[i]);
+                i++;
+            } else {
+                TI_ResetTics(t_notif);
+                state = 92;
+            }
+            break;
+
+        // Mante la notificacio visible 3 segons
+        case 92:
+            if (TI_GetTics(t_notif) >= TICKS_NOTIF) {
+                notif_cua++;
+                if (notif_cua >= NOTIF_MAX) notif_cua = 0;
+                notif_n--;
+                // Si no queden notificacions, repinta el LCD idle (nom + data)
+                if (notif_n == 0) {
+                    LcClear();
+                    LcGotoXY(0, 0);
+                    i = 0;
+                    flag_amunt = 1;
+                    state = 93;
+                } else {
+                    state = 0;      // mostra la seguent notificacio
+                }
+            }
+            break;
+
+        // Repinta el LCD idle (nom granja + data) despres de les notificacions
+        case 93:
+            linia2[1]  = '0' + desenes(dia);
+            linia2[2]  = '0' + unitats(dia);
+            linia2[4]  = '0' + desenes(mes);
+            linia2[5]  = '0' + unitats(mes);
+            if (flag_amunt) {
+                if (i < 16) {
+                    LcPutChar(linia1[i]);
+                    i++;
+                } else {
+                    LcGotoXY(0, 1);
+                    flag_amunt = 0;
+                    i = 0;
+                }
+            } else {
+                if (i < 16) {
+                    LcPutChar(linia2[i]);
+                    i++;
+                } else {
+                    state = 0;
+                }
+            }
             break;
     }
 }
