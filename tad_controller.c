@@ -670,7 +670,8 @@ void motorController(void) {
         case 12:
             if (count_temps_producte[i] >= temps_producte[i]) {
                 count_temps_producte[i] = 0;
-                if (animals_desperts[i] > 0) {
+                // Durant la rebel.lio els animals deixen de produir
+                if (animals_desperts[i] > 0 && flag_rebellio == 0) {
                     incrementarProductes(i);
                 }
             }
